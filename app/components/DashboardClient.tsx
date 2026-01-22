@@ -67,16 +67,15 @@ export default function DashboardClient() {
         setStats(prev => ({ ...prev, contacted: prev.contacted + (current ? -1 : 1) }));
     };
 
-    const generatePitch = (lead: Lead) => {
-        const name = lead.business_name;
-        if (!lead.website) {
-            return `Hi ${name}, I noticed your business on Google Maps has great reviews (${lead.rating}⭐), but no website. I build high-converting landing pages for businesses like yours to convert those viewers into customers. Open to a quick demo?`;
-        }
-        if (lead.rating < 4.5) {
-            return `Hi ${name}, saw your profile on Maps. You have a good foundation, but some recent feedback might be affecting your ranking. I specialize in Reputation Management & Local SEO to help businesses like yours win more trust. Can we chat?`;
-        }
-        return `Hi ${name}, love your presence on Google Maps! I help top-rated businesses like yours scale their digital outreach. Would you be interested in a brief audit of your current online conversion funnel?`;
+    const getAnalysis = (lead: Lead) => {
+        if (!lead.website && lead.rating >= 4.5 && lead.review_count > 50) return { tag: "The Invisible King", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating}⭐), but I couldn't find your website to see your services. You're losing high-value customers! I build premium sites for local leaders. Interested?` };
+        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build affordable, high-converting landing pages starting at ₹4999. Can I send you a 1-minute demo?` };
+        if (lead.rating < 4.2) return { tag: "Reputation Rescue", color: "bg-amber-500/20 text-amber-400", pitch: `Hi ${lead.business_name}, saw your Maps profile. You have great potential, but your current rating (${lead.rating}) might be scaring people away. I specialize in Reputation Management to push those bad reviews down. Chat?` };
+        if (lead.review_count < 30) return { tag: "Growth Needed", color: "bg-blue-500/20 text-blue-400", pitch: `Hi ${lead.business_name}, your business looks great but you only have ${lead.review_count} reviews. Competitors with more reviews are winning. I can automate your review collection. Ready to grow?` };
+        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, loved your profile. I help successful businesses like yours optimize their digital funnel to get 2x more calls. Open to a 5-min audit?` };
     };
+
+    const generatePitch = (lead: Lead) => getAnalysis(lead).pitch;
 
     const filteredLeads = leads.filter(l =>
         l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,7 +140,10 @@ export default function DashboardClient() {
                     <>
                         {viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredLeads.map(lead => <LeadCard key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={generatePitch(lead)} />)}
+                                {filteredLeads.map(lead => {
+                                    const analysis = getAnalysis(lead);
+                                    return <LeadCard key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={analysis.pitch} analysis={analysis} />
+                                })}
                             </div>
                         ) : (
                             <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden hidden md:block">
@@ -149,13 +151,16 @@ export default function DashboardClient() {
                                     <thead className="bg-slate-800/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest border-b border-slate-700">
                                         <tr>
                                             <th className="p-4">Business</th>
-                                            <th className="p-4">Context</th>
+                                            <th className="p-4">Analysis</th>
                                             <th className="p-4">Rating</th>
                                             <th className="p-4 text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-700/50">
-                                        {filteredLeads.map(lead => <LeadRow key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={generatePitch(lead)} />)}
+                                        {filteredLeads.map(lead => {
+                                            const analysis = getAnalysis(lead);
+                                            return <LeadRow key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={analysis.pitch} analysis={analysis} />
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -171,15 +176,13 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch }: { lead: Lead, onToggle: () => void, pitch: string }) {
+function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string } }) {
     return (
         <div className={`group relative bg-slate-800/40 border border-slate-700 rounded-2xl p-5 hover:border-blue-500/50 transition-all ${lead.contacted ? 'opacity-60 grayscale-[0.5]' : ''}`}>
             <div className="flex justify-between items-start mb-4">
                 <div className="flex flex-col gap-1">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit 
-                        ${lead.website ? 'bg-slate-700 text-slate-400' : 'bg-emerald-500/20 text-emerald-400'}
-                    `}>
-                        {lead.website ? 'Bad Website' : 'No Website'}
+                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit ${analysis.color}`}>
+                        {analysis.tag}
                     </span>
                     <h3 className="font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title={lead.business_name}>{lead.business_name}</h3>
                 </div>
@@ -223,7 +226,7 @@ function LeadCard({ lead, onToggle, pitch }: { lead: Lead, onToggle: () => void,
     );
 }
 
-function LeadRow({ lead, onToggle, pitch }: { lead: Lead, onToggle: () => void, pitch: string }) {
+function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string } }) {
     return (
         <tr className={`hover:bg-slate-800/40 transition-colors ${lead.contacted ? 'opacity-40' : ''}`}>
             <td className="p-4">
@@ -231,8 +234,8 @@ function LeadRow({ lead, onToggle, pitch }: { lead: Lead, onToggle: () => void, 
                 <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-1"><MapPin size={10} /> {lead.address}</div>
             </td>
             <td className="p-4">
-                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${lead.website ? 'bg-slate-700 text-slate-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                    {lead.website ? 'Ugly Web' : 'No Web'}
+                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${analysis.color}`}>
+                    {analysis.tag}
                 </span>
             </td>
             <td className="p-4">
