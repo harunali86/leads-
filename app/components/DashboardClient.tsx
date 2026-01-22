@@ -28,15 +28,25 @@ interface Lead {
     contacted: boolean;
 }
 
+const isWhatsAppCapable = (lead: Lead) => {
+    if (!lead.phone) return false;
+    if (lead.phone_type === 'MOBILE') return true;
+    if (lead.phone_type === 'LANDLINE') return false;
+    // Fallback for transition phase
+    const clean = lead.phone.replace(/\D/g, '');
+    let core = clean;
+    if (core.length === 11 && core.startsWith('0')) core = core.substring(1);
+    if (core.length === 12 && core.startsWith('91')) core = core.substring(2);
+    return core.length === 10 && /^[6-9]/.test(core);
+};
+
 export default function DashboardClient() {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid'); // Default to grid for mobile
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
-
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0 });
-    const [newLead, setNewLead] = useState({ name: '', phone: '', address: '' });
 
     useEffect(() => {
         fetchLeads();
@@ -54,9 +64,7 @@ export default function DashboardClient() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error("Supabase Error:", error);
-        }
+        if (error) console.error("Supabase Error:", error);
 
         if (!error && data) {
             setLeads(data);
@@ -82,8 +90,6 @@ export default function DashboardClient() {
         if (lead.review_count < 30) return { tag: "Growth Needed", color: "bg-blue-500/20 text-blue-400", pitch: `Hi ${lead.business_name}, your business looks great but you only have ${lead.review_count} reviews. Competitors with more reviews are winning. I can automate your review collection. Ready to grow?` };
         return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, loved your profile. I help successful businesses like yours optimize their digital funnel to get 2x more calls. Open to a 5-min audit?` };
     };
-
-    const generatePitch = (lead: Lead) => getAnalysis(lead).pitch;
 
     const filteredLeads = leads.filter(l =>
         l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -255,9 +261,9 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    {lead.phone && lead.phone_type === 'MOBILE' ? (
+                    {isWhatsAppCapable(lead) ? (
                         <a
-                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
                             className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/20 text-sm active:scale-95 transition-all"
                         >
@@ -275,7 +281,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                         </a>
                     ) : null}
 
-                    {(!lead.phone || lead.phone_type === 'LANDLINE') && !lead.email && (
+                    {(!lead.phone || (lead.phone_type === 'LANDLINE' && !isWhatsAppCapable(lead))) && !lead.email && (
                         <a
                             href={lead.google_maps_url}
                             target="_blank"
@@ -317,9 +323,9 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
                 <div className="flex justify-end gap-2">
                     <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500" title="Source"><Globe size={16} /></a>
                     <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
-                    {lead.phone && lead.phone_type === 'MOBILE' && (
+                    {isWhatsAppCapable(lead) && (
                         <a
-                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
                             className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-emerald-500/20"
                         >
