@@ -15,6 +15,7 @@ interface Lead {
     status: string;
     quality_score: number;
     phone: string | null;
+    email: string | null;
     address: string | null;
     website: string | null;
     rating: number;
@@ -249,23 +250,37 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     </button>
                 </div>
 
-                {lead.phone ? (
-                    <a
-                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
-                        target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/20 text-sm active:scale-95 transition-all"
-                    >
-                        <ExternalLink size={14} /> Send Smart Pitch
-                    </a>
-                ) : (
-                    <a
-                        href={lead.google_maps_url}
-                        target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
-                    >
-                        <Search size={14} /> Find Details on Maps
-                    </a>
-                )}
+                <div className="flex flex-col gap-2">
+                    {lead.phone ? (
+                        <a
+                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                            target="_blank"
+                            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/20 text-sm active:scale-95 transition-all"
+                        >
+                            <ExternalLink size={14} /> WhatsApp Pitch
+                        </a>
+                    ) : null}
+
+                    {lead.email ? (
+                        <a
+                            href={`mailto:${lead.email}?subject=Business Inquiry&body=${encodeURIComponent(pitch)}`}
+                            target="_blank"
+                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
+                        >
+                            <Search size={14} /> Email Pitch
+                        </a>
+                    ) : null}
+
+                    {!lead.phone && !lead.email && (
+                        <a
+                            href={lead.google_maps_url}
+                            target="_blank"
+                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
+                        >
+                            <Search size={14} /> Search Contact Info 🔎
+                        </a>
+                    )}
+                </div>
             </div>
         </div>
     );
