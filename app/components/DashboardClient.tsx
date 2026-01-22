@@ -15,7 +15,10 @@ interface Lead {
     status: string;
     quality_score: number;
     phone: string | null;
+    phone_type: 'MOBILE' | 'LANDLINE' | null;
     email: string | null;
+    instagram: string | null;
+    facebook: string | null;
     address: string | null;
     website: string | null;
     rating: number;
@@ -211,12 +214,13 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                 </div>
                 <div className="flex items-center gap-3">
                     {lead.phone ? (
-                        <div className="flex items-center gap-2 text-xs text-blue-400 font-mono font-bold bg-blue-500/10 px-2 py-1 rounded">
-                            <Phone className="w-3 h-3" /> {lead.phone}
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold px-2 py-1 rounded ${lead.phone_type === 'MOBILE' ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                            {lead.phone_type === 'MOBILE' ? <Phone className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                            {lead.phone} {lead.phone_type === 'LANDLINE' && <span className="text-[8px] opacity-70 ml-1">(Landline)</span>}
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 text-xs text-slate-500 italic bg-slate-700/30 px-2 py-1 rounded">
-                            <Info className="w-3 h-3" /> Phone Missing
+                            <Info className="w-3 h-3" /> No Number
                         </div>
                     )}
                     <a
@@ -251,7 +255,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    {lead.phone ? (
+                    {lead.phone && lead.phone_type === 'MOBILE' ? (
                         <a
                             href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
@@ -271,13 +275,13 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                         </a>
                     ) : null}
 
-                    {!lead.phone && !lead.email && (
+                    {(!lead.phone || lead.phone_type === 'LANDLINE') && !lead.email && (
                         <a
                             href={lead.google_maps_url}
                             target="_blank"
-                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
+                            className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl shadow-lg text-xs active:scale-95 transition-all"
                         >
-                            <Search size={14} /> Search Contact Info 🔎
+                            <Search size={14} /> {lead.phone_type === 'LANDLINE' ? "Find Mobile on Maps" : "Search Contact Info"}
                         </a>
                     )}
                 </div>
@@ -299,7 +303,12 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
                 </span>
             </td>
             <td className="p-4 text-xs font-mono">
-                {lead.phone ? <span className="text-blue-400">{lead.phone}</span> : <span className="text-slate-500 italic">None</span>}
+                {lead.phone ? (
+                    <div className="flex items-center gap-2">
+                        <span className={lead.phone_type === 'MOBILE' ? "text-emerald-400" : "text-amber-400"}>{lead.phone}</span>
+                        {lead.phone_type === 'MOBILE' ? <span className="text-[8px] bg-emerald-500/10 px-1 rounded">M</span> : <span className="text-[8px] bg-amber-500/10 px-1 rounded text-amber-500">L</span>}
+                    </div>
+                ) : <span className="text-slate-500 italic">None</span>}
             </td>
             <td className="p-4">
                 <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold"><Star size={12} fill="currentColor" /> {lead.rating} <span className="text-slate-500 font-normal">({lead.review_count})</span></div>
@@ -308,7 +317,7 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
                 <div className="flex justify-end gap-2">
                     <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500" title="Source"><Globe size={16} /></a>
                     <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
-                    {lead.phone && (
+                    {lead.phone && lead.phone_type === 'MOBILE' && (
                         <a
                             href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
