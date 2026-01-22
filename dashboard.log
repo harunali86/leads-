@@ -10,3 +10,4 @@ nohup: ignoring input
 
 ✓ Starting...
 ✓ Ready in 456ms
+  Reload env: .env.local

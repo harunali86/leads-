@@ -96,6 +96,13 @@ export default function DashboardClient() {
         }
     };
 
+    const generatePitch = (lead: Lead) => {
+        if (!lead.website) {
+            return `Hi ${lead.business_name}, I noticed you don't have a website listed on Google Maps. We build premium, high-converting websites starting at just ₹4999. Would you be interested in seeing a demo?`;
+        }
+        return `Hi ${lead.business_name}, I saw your profile on Google Maps and think you're missing out on some local traffic. We help businesses like yours rank higher. Open to a quick chat?`;
+    };
+
     return (
         <div className="min-h-screen bg-slate-900 text-slate-100 p-6 font-sans">
             {/* Header */}
@@ -142,7 +149,7 @@ export default function DashboardClient() {
                                 <th className="p-4 font-semibold">Business</th>
                                 <th className="p-4 font-semibold">Contact Info</th>
                                 <th className="p-4 font-semibold">Context</th>
-                                <th className="p-4 font-semibold text-right">Actions</th>
+                                <th className="p-4 font-semibold text-right">Instant Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700">
@@ -161,8 +168,8 @@ export default function DashboardClient() {
                                     </td>
 
                                     {/* Business Name */}
-                                    <td className="p-4">
-                                        <div className="font-medium text-slate-200">{lead.business_name}</div>
+                                    <td className="p-4 max-w-[200px]">
+                                        <div className="font-medium text-slate-200 truncate" title={lead.business_name}>{lead.business_name}</div>
                                         <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
                                             <MapPin className="w-3 h-3" /> {truncate(lead.address, 30)}
                                         </div>
@@ -172,9 +179,9 @@ export default function DashboardClient() {
                                     <td className="p-4">
                                         <div className="flex flex-col gap-1">
                                             {lead.phone ? (
-                                                <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm">
+                                                <div className="flex items-center gap-1.5 text-blue-400 text-sm font-mono">
                                                     <Phone className="w-3 h-3" /> {lead.phone}
-                                                </a>
+                                                </div>
                                             ) : (
                                                 <span className="text-slate-600 text-xs italic">No Phone</span>
                                             )}
@@ -205,8 +212,8 @@ export default function DashboardClient() {
                                             <button
                                                 onClick={() => toggleContacted(lead.id, lead.contacted)}
                                                 className={`p-2 rounded-lg transition-all ${lead.contacted
-                                                        ? 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                                                        : 'bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-500/20'
+                                                    ? 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                                                     }`}
                                                 title={lead.contacted ? "Mark as Pending" : "Mark as Contacted"}
                                             >
@@ -215,12 +222,12 @@ export default function DashboardClient() {
 
                                             {lead.phone && (
                                                 <a
-                                                    href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                                                    href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(generatePitch(lead))}`}
                                                     target="_blank"
-                                                    className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 shadow-lg shadow-emerald-500/20"
-                                                    title="WhatsApp"
+                                                    onClick={() => toggleContacted(lead.id, false)}
+                                                    className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 text-xs font-medium"
                                                 >
-                                                    <ExternalLink className="w-4 h-4" />
+                                                    <ExternalLink className="w-3 h-3" /> Pitch
                                                 </a>
                                             )}
                                         </div>
