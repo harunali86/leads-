@@ -181,6 +181,14 @@ export default function DashboardClient() {
 }
 
 function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string } }) {
+    const [copied, setCopied] = useState(false);
+
+    const copyPitch = () => {
+        navigator.clipboard.writeText(pitch);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
         <div className={`group relative bg-slate-800/40 border border-slate-700 rounded-2xl p-5 hover:border-blue-500/50 transition-all ${lead.contacted ? 'opacity-60 grayscale-[0.5]' : ''}`}>
             <div className="flex justify-between items-start mb-4">
@@ -197,32 +205,65 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
 
             <div className="space-y-3 mb-6">
                 <div className="flex items-start gap-2 text-xs text-slate-400">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-500" />
-                    <span>{lead.address}</span>
+                    <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-500 shrink-0" />
+                    <span className="line-clamp-2">{lead.address || "Address not fully captured"}</span>
                 </div>
-                {lead.phone && (
-                    <div className="flex items-center gap-2 text-xs text-blue-400 font-mono">
-                        <Phone className="w-3.5 h-3.5" /> {lead.phone}
-                    </div>
-                )}
+                <div className="flex items-center gap-3">
+                    {lead.phone ? (
+                        <div className="flex items-center gap-2 text-xs text-blue-400 font-mono font-bold bg-blue-500/10 px-2 py-1 rounded">
+                            <Phone className="w-3 h-3" /> {lead.phone}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 italic bg-slate-700/30 px-2 py-1 rounded">
+                            <Info className="w-3 h-3" /> Phone Missing
+                        </div>
+                    )}
+                    <a
+                        href={lead.google_maps_url}
+                        target="_blank"
+                        title="View on Google Maps"
+                        className="p-1 px-2 rounded bg-slate-700/50 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase"
+                    >
+                        <Globe className="w-3 h-3" /> Source
+                    </a>
+                </div>
             </div>
 
-            <div className="flex gap-2">
-                <button
-                    onClick={onToggle}
-                    className={`flex-1 flex justify-center py-2.5 rounded-xl transition-all border
-                        ${lead.contacted ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}
-                    `}
-                >
-                    {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
-                </button>
-                {lead.phone && (
+            <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                <div className="flex gap-2">
+                    <button
+                        onClick={onToggle}
+                        title={lead.contacted ? "Mark as New" : "Mark as Contacted"}
+                        className={`flex-1 flex justify-center py-2.5 rounded-xl transition-all border
+                            ${lead.contacted ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}
+                        `}
+                    >
+                        {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                    </button>
+                    <button
+                        onClick={copyPitch}
+                        title="Copy Pitch Message"
+                        className="flex-1 flex items-center justify-center gap-2 bg-slate-800 border border-slate-700 text-slate-400 hover:text-white py-2.5 rounded-xl transition-all text-[10px] font-bold uppercase"
+                    >
+                        {copied ? "Copied!" : "Pitch Text"}
+                    </button>
+                </div>
+
+                {lead.phone ? (
                     <a
                         href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                         target="_blank"
-                        className="flex-[2] flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-900/20 text-sm"
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/20 text-sm active:scale-95 transition-all"
                     >
-                        <ExternalLink size={14} /> Pitch WhatsApp
+                        <ExternalLink size={14} /> Send Smart Pitch
+                    </a>
+                ) : (
+                    <a
+                        href={lead.google_maps_url}
+                        target="_blank"
+                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
+                    >
+                        <Search size={14} /> Find Details on Maps
                     </a>
                 )}
             </div>
@@ -235,26 +276,30 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
         <tr className={`hover:bg-slate-800/40 transition-colors ${lead.contacted ? 'opacity-40' : ''}`}>
             <td className="p-4">
                 <div className="font-bold text-sm text-slate-200">{lead.business_name}</div>
-                <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-1"><MapPin size={10} /> {lead.address}</div>
+                <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-1 shrink-0"><MapPin size={10} /> <span className="truncate max-w-[200px]">{lead.address}</span></div>
             </td>
             <td className="p-4">
                 <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${analysis.color}`}>
                     {analysis.tag}
                 </span>
             </td>
+            <td className="p-4 text-xs font-mono">
+                {lead.phone ? <span className="text-blue-400">{lead.phone}</span> : <span className="text-slate-500 italic">None</span>}
+            </td>
             <td className="p-4">
                 <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold"><Star size={12} fill="currentColor" /> {lead.rating} <span className="text-slate-500 font-normal">({lead.review_count})</span></div>
             </td>
             <td className="p-4 text-right">
                 <div className="flex justify-end gap-2">
-                    <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
+                    <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500" title="Source"><Globe size={16} /></a>
+                    <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
                     {lead.phone && (
                         <a
                             href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
                             className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-emerald-500/20"
                         >
-                            WhatsApp Pitch
+                            WhatsApp
                         </a>
                     )}
                 </div>
