@@ -50,6 +50,10 @@ export default function DashboardClient() {
             .select('*')
             .order('created_at', { ascending: false });
 
+        if (error) {
+            console.error("Supabase Error:", error);
+        }
+
         if (!error && data) {
             setLeads(data);
             setStats({
