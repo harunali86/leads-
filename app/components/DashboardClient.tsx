@@ -85,7 +85,16 @@ export default function DashboardClient() {
         setStats(prev => ({ ...prev, contacted: prev.contacted + (current ? -1 : 1) }));
     };
 
-    const getAnalysis = (lead: Lead) => {
+    const getAnalysis = (lead: Lead): {
+        tag: string,
+        color: string,
+        pitch: string,
+        email?: string | null,
+        platform?: string,
+        jobUrl?: string | null,
+        budget?: string,
+        audit?: any
+    } => {
         let audit: any = null;
         try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
 
@@ -99,7 +108,7 @@ export default function DashboardClient() {
                 pitch: audit.ai_proposal || `Custom pitch for ${projectTitle} is being prepared...`,
                 email: lead.email as string | null,
                 platform: "Freelancer",
-                jobUrl: audit.project_url as string | null,
+                jobUrl: (audit.project_url || lead.google_maps_url) as string | null,
                 budget: budget,
                 audit: audit
             };
@@ -116,9 +125,9 @@ export default function DashboardClient() {
                 tag: "Bypass Mission",
                 color: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-rose-500/20",
                 pitch: connectionPitch,
-                email: email,
+                email: email as string | null,
                 platform: platform,
-                jobUrl: audit.job_url,
+                jobUrl: (audit.job_url || lead.google_maps_url) as string | null,
                 audit: audit
             };
         }
@@ -246,7 +255,7 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string | null, platform?: string, jobUrl?: string | null, audit?: any } }) {
+function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string | null, platform?: string, jobUrl?: string | null, budget?: string, audit?: any } }) {
     const [copied, setCopied] = useState(false);
 
     const copyPitch = () => {
@@ -272,7 +281,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     <h3 className="font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title={lead.business_name}>{lead.business_name}</h3>
                 </div>
                 <div className="flex items-center gap-1 bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded-lg text-xs font-bold">
-                    <Star className="w-3 h-3 fill-current" /> {lead.rating}
+                    {analysis.budget ? analysis.budget : <><Star className="w-3 h-3 fill-current" /> {lead.rating}</>}
                 </div>
             </div>
 
@@ -293,12 +302,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                         </div>
                     )}
                     <a
-                        href={lead.google_maps_url}
+                        href={analysis.jobUrl || lead.google_maps_url}
                         target="_blank"
-                        title={lead.google_maps_url?.includes('google.com/maps') ? "View on Google Maps" : "View Original Signal"}
                         className="p-1 px-2 rounded bg-slate-700/50 text-blue-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
                     >
-                        <Globe className="w-3 h-3" /> {analysis.platform || (lead.google_maps_url?.includes('google.com/maps') ? "Source" : "Signal")}
+                        <Globe className="w-3 h-3" /> {analysis.platform || "Source"}
                     </a>
                 </div>
             </div>
