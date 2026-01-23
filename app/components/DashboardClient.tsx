@@ -98,9 +98,9 @@ export default function DashboardClient() {
         let audit: any = null;
         try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
 
-        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
-            const projectTitle = audit.job_title || lead.business_name.replace('[PROJECT] ', '');
-            const budget = audit.budget || 'Inquiry';
+        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && (audit.source === 'HIGH_INTENT_PROJECT' || audit.intent === 'DIRECT_DEVELOPER_NEED'))) {
+            const projectTitle = (audit && audit.job_title) || lead.business_name.replace('[PROJECT] ', '');
+            const budget = (audit && audit.budget) || 'Inquiry';
 
             return {
                 tag: "🔥 Project: Hot",
