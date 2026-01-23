@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
-    ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List
+    ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
+    Mail, UserPlus, Copy
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -26,18 +27,17 @@ interface Lead {
     google_maps_url: string;
     created_at: string;
     contacted: boolean;
+    is_premium?: boolean;
+    source?: string;
+    contact_name?: string | null;
+    notes?: string | null;
 }
 
 const isWhatsAppCapable = (lead: Lead) => {
     if (!lead.phone) return false;
-    if (lead.phone_type === 'MOBILE') return true;
-    if (lead.phone_type === 'LANDLINE') return false;
-    // Fallback for transition phase
     const clean = lead.phone.replace(/\D/g, '');
-    let core = clean;
-    if (core.length === 11 && core.startsWith('0')) core = core.substring(1);
-    if (core.length === 12 && core.startsWith('91')) core = core.substring(2);
-    return core.length === 10 && /^[6-9]/.test(core);
+    // Valid for WhatsApp: 12 digits starting with 91, and next digit must be 6-9
+    return clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.substring(2));
 };
 
 export default function DashboardClient() {
@@ -46,7 +46,8 @@ export default function DashboardClient() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
-    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0 });
+    const [showPremiumOnly, setShowPremiumOnly] = useState(false);
+    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0 });
 
     useEffect(() => {
         fetchLeads();
@@ -71,7 +72,8 @@ export default function DashboardClient() {
             setStats({
                 total: data.length,
                 qualified: data.filter(l => (l.quality_score || 0) > 60).length,
-                contacted: data.filter(l => l.contacted).length
+                contacted: data.filter(l => l.contacted).length,
+                premium: data.filter(l => l.is_premium).length
             });
         }
         setLoading(false);
@@ -84,17 +86,49 @@ export default function DashboardClient() {
     };
 
     const getAnalysis = (lead: Lead) => {
-        if (!lead.website && lead.rating >= 4.5 && lead.review_count > 50) return { tag: "The Invisible King", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating}⭐), but I couldn't find your website to see your services. You're losing high-value customers! I build premium sites for local leaders. Interested?` };
-        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build affordable, high-converting landing pages starting at ₹4999. Can I send you a 1-minute demo?` };
-        if (lead.rating < 4.2) return { tag: "Reputation Rescue", color: "bg-amber-500/20 text-amber-400", pitch: `Hi ${lead.business_name}, saw your Maps profile. You have great potential, but your current rating (${lead.rating}) might be scaring people away. I specialize in Reputation Management to push those bad reviews down. Chat?` };
-        if (lead.review_count < 30) return { tag: "Growth Needed", color: "bg-blue-500/20 text-blue-400", pitch: `Hi ${lead.business_name}, your business looks great but you only have ${lead.review_count} reviews. Competitors with more reviews are winning. I can automate your review collection. Ready to grow?` };
-        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, loved your profile. I help successful businesses like yours optimize their digital funnel to get 2x more calls. Open to a 5-min audit?` };
+        let audit: any = null;
+        try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
+
+        if (lead.source === 'MISSION_CONTROL' || lead.source === 'QUALITY_SNIPER' || lead.source === 'QUALITY_BUREAU' || (audit && (audit.founder_linkedin || audit.founder_email))) {
+            const founderName = audit.founder_name || lead.contact_name || 'Founder';
+            const jobTitle = audit.job_title || 'Project';
+            const platform = audit.platform || 'Job Board';
+            const email = audit.founder_email || lead.email;
+            const connectionPitch = audit.connection_pitch || `Hi ${founderName}, I saw ${platform} mentioned that you're looking for a ${jobTitle}. I'm a developer specializing in rapid high-performance builds. Skip the portal clutter—let's handle this direct. Open to a 2-min chat?`;
+
+            return {
+                tag: "Bypass Mission",
+                color: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-rose-500/20",
+                pitch: connectionPitch,
+                email: email,
+                platform: platform,
+                jobUrl: audit.job_url,
+                audit: audit
+            };
+        }
+
+        if (lead.is_premium) {
+            let hook = "I have a growth strategy specifically for your niche.";
+            return {
+                tag: "Premium Target",
+                color: "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20",
+                pitch: `Hi ${lead.contact_name || lead.business_name}, I saw your profile on LinkedIn. ${hook} Open to a 5-min audit chat?`,
+                audit: audit
+            };
+        }
+
+        if (!lead.website && lead.rating >= 4.5 && lead.review_count > 50) return { tag: "The Invisible King", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating}⭐), but I couldn't find your website. Interested?` };
+        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build affordable pages. Can I send a demo?` };
+
+        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, loved your profile. I help businesses optimize their digital funnel. Open to a chat?` };
     };
 
-    const filteredLeads = leads.filter(l =>
-        l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (l.phone && l.phone.includes(searchTerm))
-    );
+    const filteredLeads = leads.filter(l => {
+        const matchesSearch = l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (l.phone && l.phone.includes(searchTerm));
+        const matchesPremium = showPremiumOnly ? l.is_premium : true;
+        return matchesSearch && matchesPremium;
+    });
 
     return (
         <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans pb-20">
@@ -133,6 +167,12 @@ export default function DashboardClient() {
                 </div>
 
                 <div className="flex gap-2 w-full md:w-auto">
+                    <button
+                        onClick={() => setShowPremiumOnly(!showPremiumOnly)}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all border ${showPremiumOnly ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                    >
+                        <Star className={`w-4 h-4 ${showPremiumOnly ? 'fill-current' : ''}`} /> Premium Only
+                    </button>
                     <div className="bg-slate-800/50 p-1 rounded-lg border border-slate-700 hidden md:flex">
                         <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}><LayoutGrid size={18} /></button>
                         <button onClick={() => setViewMode('table')} className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}><List size={18} /></button>
@@ -190,13 +230,20 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string } }) {
+function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string, platform?: string, jobUrl?: string, audit?: any } }) {
     const [copied, setCopied] = useState(false);
 
     const copyPitch = () => {
         navigator.clipboard.writeText(pitch);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const sendEmail = () => {
+        if (!analysis.email) return;
+        const subject = encodeURIComponent(`Regarding your ${analysis.audit?.job_title || 'project'} proposal`);
+        const body = encodeURIComponent(`Hi ${analysis.audit?.founder_name || 'Founder'},\n\nI saw your post regarding ${analysis.audit?.job_title || 'hiring'}. Instead of a freelance headache, my agency can deliver this project directly with 24/7 support.\n\nBest regards,\nHarun`);
+        window.location.href = `mailto:${analysis.email}?subject=${subject}&body=${body}`;
     };
 
     return (
@@ -232,71 +279,87 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     <a
                         href={lead.google_maps_url}
                         target="_blank"
-                        title="View on Google Maps"
-                        className="p-1 px-2 rounded bg-slate-700/50 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase"
+                        title={lead.google_maps_url?.includes('google.com/maps') ? "View on Google Maps" : "View Original Signal"}
+                        className="p-1 px-2 rounded bg-slate-700/50 text-blue-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
                     >
-                        <Globe className="w-3 h-3" /> Source
+                        <Globe className="w-3 h-3" /> {analysis.platform || (lead.google_maps_url?.includes('google.com/maps') ? "Source" : "Signal")}
                     </a>
                 </div>
             </div>
 
-            <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                <div className="flex gap-2">
-                    <button
-                        onClick={onToggle}
-                        title={lead.contacted ? "Mark as New" : "Mark as Contacted"}
-                        className={`flex-1 flex justify-center py-2.5 rounded-xl transition-all border
+            {analysis.audit && (
+                <div className="mb-4 bg-slate-900/50 rounded-xl p-3 border border-white/5">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audit Score</span>
+                        <span className={`text-[10px] font-bold ${analysis.audit.score > 70 ? 'text-emerald-400' : 'text-amber-400'}`}>{analysis.audit.score}%</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                        {analysis.audit.issues && analysis.audit.issues.map((issue: string, i: number) => (
+                            <span key={i} className="text-[9px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded border border-white/5">
+                                ⚠️ {issue}
+                            </span>
+                        ))}
+                        {(!analysis.audit.issues || analysis.audit.issues.length === 0) && <span className="text-[9px] text-emerald-400 font-bold">✅ No critical gaps found</span>}
+                    </div>
+                </div>
+            )
+            }
+
+            <div className="flex gap-2">
+                <button
+                    onClick={onToggle}
+                    title={lead.contacted ? "Mark as New" : "Mark as Contacted"}
+                    className={`flex-1 flex justify-center py-2.5 rounded-xl transition-all border
                             ${lead.contacted ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}
                         `}
-                    >
-                        {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
-                    </button>
+                >
+                    {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                </button>
+                <button
+                    onClick={copyPitch}
+                    title="Copy Pitch Message"
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+                >
+                    {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
+                    <span className="text-[10px] font-bold uppercase">{copied ? "Copied!" : "Copy Pitch"}</span>
+                </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+                {analysis.email && (
                     <button
-                        onClick={copyPitch}
-                        title="Copy Pitch Message"
-                        className="flex-1 flex items-center justify-center gap-2 bg-slate-800 border border-slate-700 text-slate-400 hover:text-white py-2.5 rounded-xl transition-all text-[10px] font-bold uppercase"
+                        onClick={sendEmail}
+                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
                     >
-                        {copied ? "Copied!" : "Pitch Text"}
+                        <Mail size={16} /> Send Direct Email
                     </button>
-                </div>
+                )}
 
-                <div className="flex flex-col gap-2">
-                    {isWhatsAppCapable(lead) ? (
-                        <a
-                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
-                            target="_blank"
-                            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/20 text-sm active:scale-95 transition-all"
-                        >
-                            <ExternalLink size={14} /> WhatsApp Pitch
-                        </a>
-                    ) : null}
+                {analysis.audit && analysis.audit.founder_linkedin ? (
+                    <a
+                        href={analysis.audit.founder_linkedin}
+                        target="_blank"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-rose-900/30 text-sm active:scale-95 transition-all"
+                    >
+                        <ExternalLink size={16} /> Message Founder (Direct)
+                    </a>
+                ) : null}
 
-                    {lead.email ? (
-                        <a
-                            href={`mailto:${lead.email}?subject=Business Inquiry&body=${encodeURIComponent(pitch)}`}
-                            target="_blank"
-                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
-                        >
-                            <Search size={14} /> Email Pitch
-                        </a>
-                    ) : null}
-
-                    {(!lead.phone || (lead.phone_type === 'LANDLINE' && !isWhatsAppCapable(lead))) && !lead.email && (
-                        <a
-                            href={lead.google_maps_url}
-                            target="_blank"
-                            className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl shadow-lg text-xs active:scale-95 transition-all"
-                        >
-                            <Search size={14} /> {lead.phone_type === 'LANDLINE' ? "Find Mobile on Maps" : "Search Contact Info"}
-                        </a>
-                    )}
-                </div>
+                {isWhatsAppCapable(lead) ? (
+                    <a
+                        href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                        target="_blank"
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl shadow-lg shadow-emerald-900/20 text-xs active:scale-95 transition-all"
+                    >
+                        <ExternalLink size={14} /> WhatsApp Pitch
+                    </a>
+                ) : null}
             </div>
         </div>
     );
 }
 
-function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string } }) {
+function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, audit?: any } }) {
     return (
         <tr className={`hover:bg-slate-800/40 transition-colors ${lead.contacted ? 'opacity-40' : ''}`}>
             <td className="p-4">
