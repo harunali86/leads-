@@ -89,6 +89,22 @@ export default function DashboardClient() {
         let audit: any = null;
         try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
 
+        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
+            const projectTitle = audit.job_title || lead.business_name.replace('[PROJECT] ', '');
+            const budget = audit.budget || 'Inquiry';
+
+            return {
+                tag: "🔥 Project: Hot",
+                color: "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20",
+                pitch: audit.ai_proposal || `Custom pitch for ${projectTitle} is being prepared...`,
+                email: lead.email as string | null,
+                platform: "Freelancer",
+                jobUrl: audit.project_url as string | null,
+                budget: budget,
+                audit: audit
+            };
+        }
+
         if (lead.source === 'MISSION_CONTROL' || lead.source === 'QUALITY_SNIPER' || lead.source === 'QUALITY_BUREAU' || (audit && (audit.founder_linkedin || audit.founder_email))) {
             const founderName = audit.founder_name || lead.contact_name || 'Founder';
             const jobTitle = audit.job_title || 'Project';
@@ -230,7 +246,7 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string, platform?: string, jobUrl?: string, audit?: any } }) {
+function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string | null, platform?: string, jobUrl?: string | null, audit?: any } }) {
     const [copied, setCopied] = useState(false);
 
     const copyPitch = () => {
@@ -317,11 +333,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                 </button>
                 <button
                     onClick={copyPitch}
-                    title="Copy Pitch Message"
+                    title={analysis.tag.includes('Project') ? "Copy AI Proposal" : "Copy Pitch message"}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
-                    <span className="text-[10px] font-bold uppercase">{copied ? "Copied!" : "Copy Pitch"}</span>
+                    <span className="text-[10px] font-bold uppercase">{copied ? "Copied!" : (analysis.tag.includes('Project') ? "Copy AI Proposal" : "Copy Pitch")}</span>
                 </button>
             </div>
 
