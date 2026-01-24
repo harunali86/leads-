@@ -172,10 +172,10 @@ export default function DashboardClient() {
             result.tag = "Premium Target";
             result.color = "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20";
             result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile and your ${lead.rating}★ rating. I specialize in high-end digital audits for premium brands. Can I send a 2-min video audit of your profile?`;
-        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 70) {
+        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50 && (lead.review_count || 0) <= 350) {
             result.tag = "Aukat Strike Target";
-            result.color = "bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg shadow-red-500/40 font-black animate-pulse";
-            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${lead.review_count} reviews and it's 4.8★ - that's huge! But you are losing so many customers because you don't have a website for booking/orders. I can build a conversion page for you today. Open to a 5-min demo?`;
+            result.color = "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/30 font-black animate-pulse";
+            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${lead.review_count} reviews and it's ${lead.rating}★ - that's incredible local trust! I noticed you are missing a professional website to handle the growth. I can build a high-converting page for you. Open to a 5-min chat?`;
         } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) {
             result.tag = "Top Rated Target";
             result.color = "bg-purple-500/20 text-purple-400";
