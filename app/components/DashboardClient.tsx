@@ -36,7 +36,7 @@ interface Lead {
 const isWhatsAppCapable = (lead: Lead) => {
     if (!lead.phone) return false;
     const clean = lead.phone.replace(/\D/g, '');
-    return clean.length >= 10; // Be permissive, show button if number looks real
+    return clean.length >= 10;
 };
 
 // Source types for tab filtering
@@ -128,109 +128,55 @@ export default function DashboardClient() {
         setStats(prev => ({ ...prev, contacted: prev.contacted + (current ? -1 : 1) }));
     };
 
-    const getAnalysis = (lead: Lead): {
-        tag: string,
-        color: string,
-        pitch: string,
-        email?: string | null,
-        platform?: string,
-        jobUrl?: string | null,
-        budget?: string,
-        audit?: any
-    } => {
+    const getAnalysis = (lead: Lead) => {
         let audit: any = null;
         try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
 
-        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && (audit.source === 'HIGH_INTENT_PROJECT' || audit.intent === 'DIRECT_DEVELOPER_NEED'))) {
-            const projectTitle = (audit && audit.job_title) || lead.business_name.replace('[PROJECT] ', '');
-            const budget = (audit && audit.budget) || 'Inquiry';
-
-            return {
-                tag: "Project: Hot",
-                color: "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20",
-                pitch: audit.ai_proposal || `Custom pitch for ${projectTitle} is being prepared...`,
-                email: lead.email as string | null,
-                platform: "Freelancer",
-                jobUrl: (audit.project_url || lead.google_maps_url) as string | null,
-                budget: budget,
-                audit: audit
-            };
-        }
-
-        if (lead.source === 'MISSION_CONTROL' || lead.source === 'QUALITY_SNIPER' || lead.source === 'QUALITY_BUREAU' || (audit && (audit.founder_linkedin || audit.founder_email))) {
-            const founderName = audit.founder_name || lead.contact_name || 'Founder';
-            const jobTitle = audit.job_title || 'Project';
-            const platform = audit.platform || 'Job Board';
-            const email = audit.founder_email || lead.email;
-            const connectionPitch = audit.connection_pitch || `Hi ${founderName}, I saw ${platform} mentioned that you're looking for a ${jobTitle}. I'm a developer specializing in rapid high-performance builds. Skip the portal clutter—let's handle this direct. Open to a 2-min chat?`;
-
-            return {
-                tag: "Bypass Mission",
-                color: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-rose-500/20",
-                pitch: connectionPitch,
-                email: email as string | null,
-                platform: platform,
-                jobUrl: (audit.job_url || lead.google_maps_url) as string | null,
-                audit: audit
-            };
-        }
-
-        if (lead.is_premium) {
-            let hook = "I have a growth strategy specifically for your niche.";
-            return {
-                tag: "Premium Target",
-                color: "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20",
-                pitch: `Hi ${lead.contact_name || lead.business_name}, I saw your profile on LinkedIn. ${hook} Open to a 5-min audit chat?`,
-                audit: audit
-            };
-        }
-
-        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) return {
-            tag: "Aukat Strike Target",
-            color: "bg-red-500/20 text-red-500 border border-red-500/30 font-black",
-            pitch: `Hi ${lead.business_name}, I saw your legacy profile with ${(lead.review_count || 0)} reviews. You're a leader in the market, but your digital presence is missing. Can we talk about a high-end Next.js page?`,
-            platform: "Google Maps",
-            jobUrl: lead.google_maps_url
-        };
-        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) return {
-            tag: "Top Rated Target",
-            color: "bg-purple-500/20 text-purple-400",
-            pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating} Stars), but I couldn't find your website. Interested?`,
-            platform: "Google Maps",
-            jobUrl: lead.google_maps_url
-        };
-        if (!lead.website) return {
-            tag: "No Website",
-            color: "bg-emerald-500/20 text-emerald-400",
-            pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build professional web pages. Can I send a demo?`,
-            platform: "Google Maps",
-            jobUrl: lead.google_maps_url
-        };
-
-        if (lead.source === 'VERIFIED_FUNDING' || (audit && audit.source === 'VERIFIED_FUNDING')) {
-            const founderName = lead.contact_name || 'Founder';
-            const company = lead.business_name.replace('[FUNDED] ', '');
-            const amount = audit.funding_amount || 'Seed';
-            const pitch = `Hi ${founderName}, congratulations on the ${amount} funding for ${company}! I am a developer specializing in rapid React/Next.js scaling. Given your new growth phase, I can help you ship features faster while you build your core team. Open to a brief chat?`;
-
-            return {
-                tag: "Verified: Funded",
-                color: "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20",
-                pitch: pitch,
-                email: lead.email as string | null,
-                platform: "Direct Email",
-                jobUrl: lead.google_maps_url as string | null,
-                audit: audit
-            };
-        }
-
-        return {
+        const result = {
             tag: "Optimization",
             color: "bg-slate-700 text-slate-300",
             pitch: `Hi ${lead.business_name}, I help businesses optimize their digital presence. Open to a chat?`,
-            platform: lead.google_maps_url?.includes('maps') ? "Google Maps" : "Source",
-            jobUrl: lead.google_maps_url
+            email: lead.email,
+            sourceUrl: lead.google_maps_url,
+            websiteUrl: lead.website,
+            platform: "Maps",
+            audit: audit,
+            budget: null as string | null
         };
+
+        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
+            result.tag = "Project: Hot";
+            result.color = "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20";
+            result.pitch = audit.ai_proposal || `Hi, I saw your project. Let's talk?`;
+            result.platform = "Freelancer";
+            result.sourceUrl = audit.project_url || lead.google_maps_url;
+            result.budget = audit.budget;
+        } else if (lead.source === 'MISSION_CONTROL' || (audit && (audit.founder_linkedin || audit.founder_email))) {
+            result.tag = "Bypass Mission";
+            result.color = "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-rose-500/20";
+            result.pitch = audit.connection_pitch || `Hi ${audit.founder_name || 'Founder'}, let's connect.`;
+            result.platform = audit.platform || "Direct";
+            result.sourceUrl = audit.job_url || audit.founder_linkedin || lead.google_maps_url;
+            result.email = audit.founder_email || lead.email;
+        } else if (lead.is_premium) {
+            result.tag = "Premium Target";
+            result.color = "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20";
+            result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile. Open to a 5-min audit chat?`;
+        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) {
+            result.tag = "Aukat Strike Target";
+            result.color = "bg-red-500/20 text-red-500 border border-red-500/30 font-black";
+            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${(lead.review_count || 0)} reviews. Digital presence missing. Can we talk about a high-end site?`;
+        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) {
+            result.tag = "Top Rated Target";
+            result.color = "bg-purple-500/20 text-purple-400";
+            result.pitch = `Hi ${lead.business_name}, I saw you're one of the top-rated (${lead.rating} Stars), but I couldn't find your website.`;
+        } else if (!lead.website) {
+            result.tag = "No Website";
+            result.color = "bg-emerald-500/20 text-emerald-400";
+            result.pitch = `Hi ${lead.business_name}, noticed you don't have a website. Can I send a demo?`;
+        }
+
+        return result;
     };
 
     const filteredLeads = leads.filter(l => {
@@ -379,7 +325,21 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, email?: string | null, platform?: string, jobUrl?: string | null, budget?: string, audit?: any } }) {
+function LeadCard({ lead, onToggle, pitch, analysis }: {
+    lead: Lead,
+    onToggle: () => void,
+    pitch: string,
+    analysis: {
+        tag: string,
+        color: string,
+        email?: string | null,
+        platform?: string,
+        sourceUrl: string,
+        websiteUrl: string | null,
+        budget?: string | null,
+        audit?: any
+    }
+}) {
     const [copied, setCopied] = useState(false);
 
     const copyPitch = () => {
@@ -425,9 +385,9 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                             <Info className="w-3 h-3" /> No Number
                         </div>
                     )}
-                    {lead.website && (
+                    {analysis.websiteUrl && (
                         <a
-                            href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
+                            href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`}
                             target="_blank"
                             className="p-1 px-2 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
                         >
@@ -435,11 +395,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                         </a>
                     )}
                     <a
-                        href={analysis.jobUrl || lead.google_maps_url}
+                        href={analysis.sourceUrl}
                         target="_blank"
                         className="p-1 px-2 rounded bg-slate-700/50 text-emerald-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-emerald-500/20"
                     >
-                        <MapPin className="w-3 h-3" /> Source Context
+                        <MapPin className="w-3 h-3" /> Source: {analysis.platform}
                     </a>
                 </div>
             </div>
@@ -495,25 +455,6 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
             </div>
 
             <div className="flex flex-col gap-2">
-                {analysis.email && (
-                    <button
-                        onClick={sendEmail}
-                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-sm active:scale-95 transition-all"
-                    >
-                        <Mail size={16} /> Send Direct Email
-                    </button>
-                )}
-
-                {analysis.audit && analysis.audit.founder_linkedin ? (
-                    <a
-                        href={analysis.audit.founder_linkedin}
-                        target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-rose-900/30 text-sm active:scale-95 transition-all"
-                    >
-                        <ExternalLink size={16} /> Message Founder (Direct)
-                    </a>
-                ) : null}
-
                 {isWhatsAppCapable(lead) ? (
                     <a
                         href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
@@ -522,13 +463,48 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     >
                         <Send size={16} /> WhatsApp Strike
                     </a>
-                ) : null}
+                ) : (
+                    <button className="w-full bg-slate-700 text-slate-500 font-bold py-3 rounded-xl text-sm cursor-not-allowed italic">
+                        No WhatsApp Capability
+                    </button>
+                )}
+
+                <div className="flex gap-2">
+                    {analysis.email && (
+                        <button
+                            onClick={sendEmail}
+                            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-xs active:scale-95 transition-all"
+                        >
+                            <Mail size={14} /> Email
+                        </button>
+                    )}
+                    {analysis.audit?.founder_linkedin && (
+                        <a
+                            href={analysis.audit.founder_linkedin}
+                            target="_blank"
+                            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-rose-900/30 text-xs active:scale-95 transition-all"
+                        >
+                            <ExternalLink size={14} /> LinkedIn
+                        </a>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: () => void, pitch: string, analysis: { tag: string, color: string, audit?: any } }) {
+function LeadRow({ lead, onToggle, pitch, analysis }: {
+    lead: Lead,
+    onToggle: () => void,
+    pitch: string,
+    analysis: {
+        tag: string,
+        color: string,
+        sourceUrl: string,
+        websiteUrl: string | null,
+        audit?: any
+    }
+}) {
     return (
         <tr className={`hover:bg-slate-800/40 transition-colors ${lead.contacted ? 'opacity-40' : ''}`}>
             <td className="p-4">
@@ -553,8 +529,8 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
             </td>
             <td className="p-4 text-right">
                 <div className="flex justify-end gap-2 items-center">
-                    {lead.website && <a href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-blue-400" title="Visit Site"><Globe size={16} /></a>}
-                    <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-emerald-400" title="View Source"><MapPin size={16} /></a>
+                    {analysis.websiteUrl && <a href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-blue-400" title="Visit Site"><Globe size={16} /></a>}
+                    <a href={analysis.sourceUrl} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-emerald-400" title="View Source"><MapPin size={16} /></a>
                     <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
                     {isWhatsAppCapable(lead) && (
                         <a
