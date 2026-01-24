@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target
+    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -50,10 +50,11 @@ const formatPhoneForWhatsApp = (phone: string): string => {
 };
 
 // Source types for tab filtering
-type SourceTab = 'ALL' | 'JAN_25' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
+type SourceTab = 'ALL' | 'JAN_25' | 'JAN_25_2' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
 
 const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[] = [
     { key: 'JAN_25', label: '25 Jan', icon: Target, color: 'rose' },
+    { key: 'JAN_25_2', label: 'Quality 200', icon: Award, color: 'amber' },
     { key: 'ALL', label: 'All', icon: LayoutGrid, color: 'blue' },
     { key: 'GULF', label: 'Gulf', icon: Globe, color: 'purple' },
     { key: 'GOOGLE_MAPS', label: 'Maps', icon: Map, color: 'emerald' },
@@ -89,6 +90,12 @@ const getLeadSource = (lead: Lead): string => {
         return 'JAN_25';
     }
 
+    // JAN 25.2 (QUALITY 200)
+    // 70+ Reviews + 4.7+ Rating + No Website + Phone
+    if (!lead.website && lead.phone && (lead.review_count || 0) >= 70 && (lead.rating || 0) >= 4.7) {
+        return 'JAN_25_2';
+    }
+
     if (lead.google_maps_url?.includes('google.com/maps')) return 'GOOGLE_MAPS';
     return 'UNKNOWN';
 };
@@ -102,7 +109,7 @@ export default function DashboardClient() {
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
     const [activeTab, setActiveTab] = useState<SourceTab>('ALL');
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
-    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, JAN_25: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
+    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, JAN_25: 0, JAN_25_2: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
 
     useEffect(() => {
         fetchLeads();
@@ -132,10 +139,11 @@ export default function DashboardClient() {
                 aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
             });
             // Count leads by source
-            const counts: Record<SourceTab, number> = { ALL: data.length, JAN_25: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
+            const counts: Record<SourceTab, number> = { ALL: data.length, JAN_25: 0, JAN_25_2: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
             data.forEach(lead => {
                 const src = getLeadSource(lead);
                 if (src === 'JAN_25') counts.JAN_25++;
+                else if (src === 'JAN_25_2') counts.JAN_25_2++;
                 else if (src === 'GOOGLE_MAPS') counts.GOOGLE_MAPS++;
                 else if (src === 'GULF') counts.GULF++;
                 else if (src === 'HACKER_NEWS') counts.HACKER_NEWS++;
@@ -213,6 +221,7 @@ export default function DashboardClient() {
         if (activeTab !== 'ALL') {
             const leadSource = getLeadSource(l);
             if (activeTab === 'JAN_25') matchesSource = leadSource === 'JAN_25';
+            else if (activeTab === 'JAN_25_2') matchesSource = leadSource === 'JAN_25_2';
             else if (activeTab === 'GOOGLE_MAPS') matchesSource = leadSource === 'GOOGLE_MAPS';
             else if (activeTab === 'GULF') matchesSource = leadSource === 'GULF' || leadSource === 'GULF_SNIPER';
             else if (activeTab === 'HACKER_NEWS') matchesSource = leadSource === 'HACKER_NEWS';
@@ -430,7 +439,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                             <Globe className="w-4 h-4" /> VISIT SITE
                         </a>
                     )}
-                    {lead.phone && (
+                    {lead.phone && (lead.phone_type === 'MOBILE' || (lead.phone.startsWith('91') && lead.phone.length === 12)) && (
                         <a
                             href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
                             target="_blank"
