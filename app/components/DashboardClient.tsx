@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send
+    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -411,7 +411,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                             target="_blank"
                             className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-[11px] font-black uppercase border border-blue-500/20"
                         >
-                            <Globe className="w-4 h-4" /> VISIT WEBSITE
+                            <Globe className="w-4 h-4" /> VISIT SITE
                         </a>
                     )}
                     <a
@@ -419,8 +419,24 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                         target="_blank"
                         className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-[11px] font-black uppercase border border-emerald-500/20"
                     >
-                        <MapPin className="w-4 h-4" /> GOOGLE MAPS
+                        <MapPin className="w-4 h-4" /> MAPS
                     </a>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Bhai, ye lead kachara hai? Delete kar doon?')) {
+                                supabase.from('leads').delete().eq('id', lead.id).then(({ error }) => {
+                                    if (!error) {
+                                        window.location.reload(); // Simple reload to refresh list
+                                    }
+                                });
+                            }
+                        }}
+                        className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 group"
+                        title="Kill this junk lead"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
