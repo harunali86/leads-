@@ -425,7 +425,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                             <Info className="w-3 h-3" /> No Number
                         </div>
                     )}
-                    {lead.website ? (
+                    {lead.website && (
                         <a
                             href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
                             target="_blank"
@@ -433,17 +433,13 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                         >
                             <Globe className="w-3 h-3" /> Visit Site
                         </a>
-                    ) : (
-                        <div className="flex items-center gap-2 text-[10px] text-red-400 bg-red-500/10 px-2 py-1 rounded font-bold uppercase border border-red-500/20">
-                            <XCircle className="w-3 h-3" /> No Website
-                        </div>
                     )}
                     <a
                         href={analysis.jobUrl || lead.google_maps_url}
                         target="_blank"
-                        className="p-1 px-2 rounded bg-slate-700/50 text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-white/5"
+                        className="p-1 px-2 rounded bg-slate-700/50 text-emerald-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-emerald-500/20"
                     >
-                        <MapPin className="w-3 h-3" /> View Source
+                        <MapPin className="w-3 h-3" /> Source Context
                     </a>
                 </div>
             </div>
@@ -556,16 +552,17 @@ function LeadRow({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: ()
                 <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold"><Star size={12} fill="currentColor" /> {lead.rating} <span className="text-slate-500 font-normal">({lead.review_count})</span></div>
             </td>
             <td className="p-4 text-right">
-                <div className="flex justify-end gap-2">
-                    <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500" title="Source"><Globe size={16} /></a>
+                <div className="flex justify-end gap-2 items-center">
+                    {lead.website && <a href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-blue-400" title="Visit Site"><Globe size={16} /></a>}
+                    <a href={lead.google_maps_url} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-emerald-400" title="View Source"><MapPin size={16} /></a>
                     <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
                     {isWhatsAppCapable(lead) && (
                         <a
                             href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
-                            className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border border-emerald-500/20"
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1"
                         >
-                            WhatsApp
+                            <Send size={10} /> Strike
                         </a>
                     )}
                 </div>
