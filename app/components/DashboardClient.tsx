@@ -389,17 +389,17 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                         <a
                             href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`}
                             target="_blank"
-                            className="p-1 px-2 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
+                            className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-[11px] font-black uppercase border border-blue-500/20"
                         >
-                            <Globe className="w-3 h-3" /> Visit Site
+                            <Globe className="w-4 h-4" /> VISIT WEBSITE
                         </a>
                     )}
                     <a
                         href={analysis.sourceUrl}
                         target="_blank"
-                        className="p-1 px-2 rounded bg-slate-700/50 text-emerald-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-emerald-500/20"
+                        className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-[11px] font-black uppercase border border-emerald-500/20"
                     >
-                        <MapPin className="w-3 h-3" /> Source: {analysis.platform}
+                        <MapPin className="w-4 h-4" /> VIEW SOURCE
                     </a>
                 </div>
             </div>
@@ -528,19 +528,27 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                 <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold"><Star size={12} fill="currentColor" /> {lead.rating} <span className="text-slate-500 font-normal">({lead.review_count})</span></div>
             </td>
             <td className="p-4 text-right">
-                <div className="flex justify-end gap-2 items-center">
-                    {analysis.websiteUrl && <a href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-blue-400" title="Visit Site"><Globe size={16} /></a>}
-                    <a href={analysis.sourceUrl} target="_blank" className="p-2 hover:bg-slate-700 rounded-lg transition-all text-emerald-400" title="View Source"><MapPin size={16} /></a>
-                    <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
+                <div className="flex justify-end gap-3 items-center">
+                    {analysis.websiteUrl && (
+                        <a href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`} target="_blank" className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-lg transition-all border border-blue-500/20" title="Visit Website">
+                            <Globe size={18} />
+                        </a>
+                    )}
+                    <a href={analysis.sourceUrl} target="_blank" className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition-all border border-emerald-500/20" title="View Source">
+                        <MapPin size={18} />
+                    </a>
                     {isWhatsAppCapable(lead) && (
                         <a
                             href={`https://wa.me/${lead.phone!.replace(/\D/g, '').length === 10 ? '91' + lead.phone!.replace(/\D/g, '') : lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
-                            className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1 border-b-2 border-emerald-700 active:translate-y-0.5"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 border-b-2 border-emerald-700 active:translate-y-0.5"
                         >
-                            <Send size={12} /> STRIKE
+                            <Send size={14} /> STRIKE
                         </a>
                     )}
+                    <button onClick={onToggle} className={`p-2 rounded-lg transition-all border ${lead.contacted ? 'bg-slate-700 text-slate-500' : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'}`}>
+                        {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                    </button>
                 </div>
             </td>
         </tr>
