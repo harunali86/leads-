@@ -457,11 +457,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
             <div className="flex flex-col gap-2">
                 {isWhatsAppCapable(lead) ? (
                     <a
-                        href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                        href={`https://wa.me/${lead.phone!.replace(/\D/g, '').length === 10 ? '91' + lead.phone!.replace(/\D/g, '') : lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/40 text-sm active:scale-95 transition-all mt-2"
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/20 text-base active:scale-95 transition-all mt-2 border-b-4 border-emerald-700"
                     >
-                        <Send size={16} /> WhatsApp Strike
+                        <Send size={20} /> WHATSAPP STRIKE
                     </a>
                 ) : (
                     <button className="w-full bg-slate-700 text-slate-500 font-bold py-3 rounded-xl text-sm cursor-not-allowed italic">
@@ -534,11 +534,11 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                     <button onClick={onToggle} className="p-2 hover:bg-slate-700 rounded-lg transition-all text-slate-500">{lead.contacted ? <XCircle size={16} /> : <CheckCircle size={16} />}</button>
                     {isWhatsAppCapable(lead) && (
                         <a
-                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '').length === 10 ? '91' + lead.phone!.replace(/\D/g, '') : lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1 border-b-2 border-emerald-700 active:translate-y-0.5"
                         >
-                            <Send size={10} /> Strike
+                            <Send size={12} /> STRIKE
                         </a>
                     )}
                 </div>
