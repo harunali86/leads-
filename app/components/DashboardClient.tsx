@@ -405,11 +405,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                         </a>
                     )}
                     <a
-                        href={analysis.sourceUrl}
+                        href={lead.google_maps_url}
                         target="_blank"
                         className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-[11px] font-black uppercase border border-emerald-500/20"
                     >
-                        <MapPin className="w-4 h-4" /> VIEW SOURCE
+                        <MapPin className="w-4 h-4" /> GOOGLE MAPS
                     </a>
                 </div>
             </div>
@@ -475,7 +475,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                     </a>
                 ) : (
                     <a
-                        href={analysis.sourceUrl}
+                        href={lead.google_maps_url}
                         target="_blank"
                         className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 text-lg active:scale-95 transition-all border-b-4 border-orange-700"
                     >
@@ -548,7 +548,7 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                             <Globe size={18} />
                         </a>
                     )}
-                    <a href={analysis.sourceUrl} target="_blank" className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition-all border border-emerald-500/20" title="View Source">
+                    <a href={lead.google_maps_url} target="_blank" className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition-all border border-emerald-500/20" title="Google Maps">
                         <MapPin size={18} />
                     </a>
                     {isWhatsAppCapable(lead) ? (
@@ -561,7 +561,7 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                         </a>
                     ) : (
                         <a
-                            href={analysis.sourceUrl}
+                            href={lead.google_maps_url}
                             target="_blank"
                             className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-orange-500/30 flex items-center gap-2 border-b-2 border-orange-700"
                         >
