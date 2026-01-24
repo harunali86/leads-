@@ -82,7 +82,7 @@ const getLeadSource = (lead: Lead): string => {
     const name = lead.business_name.toLowerCase();
     const highTicketKeywords = ['luxury', 'premium', 'diamond', 'gold', 'jewel', 'realty', 'estate', 'robotic', 'implant', 'architect', 'villa', 'residency', 'heights', 'developer', 'associate', 'international', 'wedding', 'event', 'clinic', 'fitness', 'gym', 'skin', 'derma', 'dental'];
 
-    const isEstablished = (lead.review_count || 0) >= 40;
+    const isEstablished = (lead.review_count || 0) >= 100;
     const isHighValue = highTicketKeywords.some(w => name.includes(w)) || (lead.rating || 0) >= 4.7;
 
     if (!lead.website && lead.phone && isEstablished && isHighValue) {
