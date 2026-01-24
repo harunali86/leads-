@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy
+    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -40,6 +40,36 @@ const isWhatsAppCapable = (lead: Lead) => {
     return clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.substring(2));
 };
 
+// Source types for tab filtering
+type SourceTab = 'ALL' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
+
+const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[] = [
+    { key: 'ALL', label: 'All', icon: LayoutGrid, color: 'blue' },
+    { key: 'GULF', label: 'Gulf', icon: Globe, color: 'purple' },
+    { key: 'GOOGLE_MAPS', label: 'Maps', icon: Map, color: 'emerald' },
+    { key: 'HACKER_NEWS', label: 'HN', icon: Newspaper, color: 'orange' },
+    { key: 'REDDIT', label: 'Reddit', icon: MessageCircle, color: 'red' },
+    { key: 'FUNDED', label: 'Funded', icon: DollarSign, color: 'cyan' },
+];
+
+// Helper to detect lead source from notes
+const getLeadSource = (lead: Lead): string => {
+    try {
+        if (lead.notes) {
+            const notes = JSON.parse(lead.notes);
+            if (notes.source) return notes.source;
+            if (notes.market === 'MIDDLE_EAST') return 'GULF';
+        }
+    } catch (e) { }
+    if (lead.source === 'GULF_SNIPER') return 'GULF';
+    if (lead.source) return lead.source;
+    if (lead.business_name?.startsWith('[HN]')) return 'HACKER_NEWS';
+    if (lead.business_name?.startsWith('[Reddit]')) return 'REDDIT';
+    if (lead.business_name?.startsWith('[FUNDED]')) return 'VERIFIED_FUNDING';
+    if (lead.google_maps_url?.includes('google.com/maps')) return 'GOOGLE_MAPS';
+    return 'UNKNOWN';
+};
+
 export default function DashboardClient() {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,7 +77,9 @@ export default function DashboardClient() {
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
-    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0 });
+    const [activeTab, setActiveTab] = useState<SourceTab>('ALL');
+    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
+    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
 
     useEffect(() => {
         fetchLeads();
@@ -72,9 +104,21 @@ export default function DashboardClient() {
             setStats({
                 total: data.length,
                 qualified: data.filter(l => (l.quality_score || 0) > 60).length,
-                contacted: data.filter(l => l.contacted).length,
-                premium: data.filter(l => l.is_premium).length
+                contacted: data.filter(l => l.status === 'CONTACTED' || l.contacted).length,
+                premium: data.filter(l => l.is_premium).length,
+                aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
             });
+            // Count leads by source
+            const counts: Record<SourceTab, number> = { ALL: data.length, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
+            data.forEach(lead => {
+                const src = getLeadSource(lead);
+                if (src === 'GOOGLE_MAPS') counts.GOOGLE_MAPS++;
+                else if (src === 'GULF') counts.GULF++;
+                else if (src === 'HACKER_NEWS') counts.HACKER_NEWS++;
+                else if (src === 'REDDIT') counts.REDDIT++;
+                else if (src === 'VERIFIED_FUNDING' || src === 'FUNDED') counts.FUNDED++;
+            });
+            setSourceCounts(counts);
         }
         setLoading(false);
     };
@@ -103,7 +147,7 @@ export default function DashboardClient() {
             const budget = (audit && audit.budget) || 'Inquiry';
 
             return {
-                tag: "🔥 Project: Hot",
+                tag: "Project: Hot",
                 color: "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20",
                 pitch: audit.ai_proposal || `Custom pitch for ${projectTitle} is being prepared...`,
                 email: lead.email as string | null,
@@ -142,17 +186,45 @@ export default function DashboardClient() {
             };
         }
 
-        if (!lead.website && lead.rating >= 4.5 && lead.review_count > 50) return { tag: "The Invisible King", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating}⭐), but I couldn't find your website. Interested?` };
-        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build affordable pages. Can I send a demo?` };
+        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) return { tag: "Aukat Strike Target", color: "bg-red-500/20 text-red-500 border border-red-500/30 font-black", pitch: `Hi ${lead.business_name}, I saw your legacy profile with ${(lead.review_count || 0)} reviews. You're a leader in the market, but your digital presence is missing. Can we talk about a high-end Next.js page?` };
+        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) return { tag: "Top Rated Target", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating} Stars), but I couldn't find your website. Interested?` };
+        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build professional web pages. Can I send a demo?` };
 
-        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, loved your profile. I help businesses optimize their digital funnel. Open to a chat?` };
+        if (lead.source === 'VERIFIED_FUNDING' || (audit && audit.source === 'VERIFIED_FUNDING')) {
+            const founderName = lead.contact_name || 'Founder';
+            const company = lead.business_name.replace('[FUNDED] ', '');
+            const amount = audit.funding_amount || 'Seed';
+            const pitch = `Hi ${founderName}, congratulations on the ${amount} funding for ${company}! I am a developer specializing in rapid React/Next.js scaling. Given your new growth phase, I can help you ship features faster while you build your core team. Open to a brief chat?`;
+
+            return {
+                tag: "Verified: Funded",
+                color: "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20",
+                pitch: pitch,
+                email: lead.email as string | null,
+                platform: "Direct Email",
+                jobUrl: lead.google_maps_url as string | null,
+                audit: audit
+            };
+        }
+
+        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, I help businesses optimize their digital presence. Open to a chat?` };
     };
 
     const filteredLeads = leads.filter(l => {
         const matchesSearch = l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (l.phone && l.phone.includes(searchTerm));
         const matchesPremium = showPremiumOnly ? l.is_premium : true;
-        return matchesSearch && matchesPremium;
+        // Source tab filter
+        let matchesSource = true;
+        if (activeTab !== 'ALL') {
+            const leadSource = getLeadSource(l);
+            if (activeTab === 'GOOGLE_MAPS') matchesSource = leadSource === 'GOOGLE_MAPS';
+            else if (activeTab === 'GULF') matchesSource = leadSource === 'GULF' || leadSource === 'GULF_SNIPER';
+            else if (activeTab === 'HACKER_NEWS') matchesSource = leadSource === 'HACKER_NEWS';
+            else if (activeTab === 'REDDIT') matchesSource = leadSource === 'REDDIT';
+            else if (activeTab === 'FUNDED') matchesSource = leadSource === 'VERIFIED_FUNDING' || leadSource === 'FUNDED';
+        }
+        return matchesSearch && matchesPremium && matchesSource;
     });
 
     return (
@@ -170,11 +242,40 @@ export default function DashboardClient() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 md:gap-4 w-full md:w-auto">
+                    <div className="grid grid-cols-4 gap-2 md:gap-4 w-full md:w-auto">
                         <StatItem label="Total" value={stats.total} color="text-blue-400" />
+                        <StatItem label="Aukat" value={stats.aukat} color="text-red-500" />
                         <StatItem label="Hot" value={stats.qualified} color="text-emerald-400" />
                         <StatItem label="Done" value={stats.contacted} color="text-purple-400" />
                     </div>
+                </div>
+            </div>
+
+            {/* Source Tabs */}
+            <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {SOURCE_TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.key;
+                        const count = sourceCounts[tab.key];
+                        return (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all whitespace-nowrap border ${isActive
+                                    ? `bg-${tab.color}-500/20 border-${tab.color}-500 text-${tab.color}-400`
+                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
+                                    }`}
+                                style={isActive ? { backgroundColor: `var(--${tab.color}-500-20, rgba(59,130,246,0.2))` } : {}}
+                            >
+                                <Icon size={16} />
+                                {tab.label}
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? `bg-${tab.color}-500/30` : 'bg-slate-700'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -320,14 +421,26 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     <div className="flex flex-wrap gap-1">
                         {analysis.audit.issues && analysis.audit.issues.map((issue: string, i: number) => (
                             <span key={i} className="text-[9px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded border border-white/5">
-                                ⚠️ {issue}
+                                Issue: {issue}
                             </span>
                         ))}
-                        {(!analysis.audit.issues || analysis.audit.issues.length === 0) && <span className="text-[9px] text-emerald-400 font-bold">✅ No critical gaps found</span>}
+                        {(!analysis.audit.issues || analysis.audit.issues.length === 0) && <span className="text-[9px] text-emerald-400 font-bold">Verified: No critical gaps found</span>}
                     </div>
                 </div>
             )
             }
+
+            <div className="mb-4 bg-blue-500/5 rounded-xl p-4 border border-blue-500/10">
+                <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Outreach Pitch</span>
+                    <button onClick={copyPitch} className="text-[9px] font-bold text-slate-500 hover:text-blue-400 uppercase transition-colors">
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300 italic">
+                    "{pitch}"
+                </p>
+            </div>
 
             <div className="flex gap-2">
                 <button
@@ -373,9 +486,9 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                     <a
                         href={`https://wa.me/${lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl shadow-lg shadow-emerald-900/20 text-xs active:scale-95 transition-all"
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-900/40 text-sm active:scale-95 transition-all mt-2"
                     >
-                        <ExternalLink size={14} /> WhatsApp Pitch
+                        <Send size={16} /> WhatsApp Strike
                     </a>
                 ) : null}
             </div>
