@@ -157,33 +157,33 @@ export default function DashboardClient() {
         if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
             result.tag = "Project: Hot";
             result.color = "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20";
-            result.pitch = audit.ai_proposal || `Hi, I saw your project. Let's talk?`;
+            result.pitch = audit.ai_proposal || `Hi, I saw your project for ${lead.business_name}. I've handled similar tech stacks before. Can we discuss the specs?`;
             result.platform = "Freelancer";
             result.sourceUrl = audit.project_url || lead.google_maps_url;
             result.budget = audit.budget;
         } else if (lead.source === 'MISSION_CONTROL' || (audit && (audit.founder_linkedin || audit.founder_email))) {
             result.tag = "Bypass Mission";
             result.color = "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-rose-500/20";
-            result.pitch = audit.connection_pitch || `Hi ${audit.founder_name || 'Founder'}, let's connect.`;
+            result.pitch = audit.connection_pitch || `Hi ${audit.founder_name || 'Founder'}, I noticed ${lead.business_name} is scaling. I help founders ship MVPs fast. Open to a quick chat?`;
             result.platform = audit.platform || "Direct";
             result.sourceUrl = audit.job_url || audit.founder_linkedin || lead.google_maps_url;
             result.email = audit.founder_email || lead.email;
         } else if (lead.is_premium) {
             result.tag = "Premium Target";
             result.color = "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20";
-            result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile. Open to a 5-min audit chat?`;
+            result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile and your ${lead.rating}★ rating. I specialize in high-end digital audits for premium brands. Can I send a 2-min video audit of your profile?`;
         } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) {
             result.tag = "Aukat Strike Target";
             result.color = "bg-red-500/20 text-red-500 border border-red-500/30 font-black";
-            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${(lead.review_count || 0)} reviews. Digital presence missing. Can we talk about a high-end site?`;
+            result.pitch = `Hi ${lead.business_name}, I was looking for your services online but couldn't find a website. You have ${lead.review_count} reviews and it's 4.8★ - that's massive! I can build a conversion page to help you capture all the customers currently missing you. Open to a demo?`;
         } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) {
             result.tag = "Top Rated Target";
             result.color = "bg-purple-500/20 text-purple-400";
-            result.pitch = `Hi ${lead.business_name}, I saw you're one of the top-rated (${lead.rating} Stars), but I couldn't find your website.`;
+            result.pitch = `Hi ${lead.business_name}, I saw you're one of the top-rated local spots (${lead.rating}★), but I couldn't find your website to check your services. I help businesses like yours get a professional digital presence. Can I send a sample?`;
         } else if (!lead.website) {
             result.tag = "No Website";
             result.color = "bg-emerald-500/20 text-emerald-400";
-            result.pitch = `Hi ${lead.business_name}, noticed you don't have a website. Can I send a demo?`;
+            result.pitch = `Hi ${lead.business_name}, I noticed you don't have a website listed on Maps yet. I'm a local dev and I build quick, affordable sites for businesses in the area. Can I send you a 1-page demo?`;
         }
 
         return result;
