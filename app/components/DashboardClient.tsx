@@ -36,11 +36,7 @@ interface Lead {
 const isWhatsAppCapable = (lead: Lead) => {
     if (!lead.phone) return false;
     const clean = lead.phone.replace(/\D/g, '');
-    // Support Indian formats: 10 digits, 11 digits (starts with 0), or 12 digits (starts with 91)
-    if (clean.length === 10 && /^[6-9]/.test(clean)) return true;
-    if (clean.length === 11 && clean.startsWith('0') && /^[6-9]/.test(clean.substring(1))) return true;
-    if (clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.substring(2))) return true;
-    return false;
+    return clean.length >= 10; // Be permissive, show button if number looks real
 };
 
 // Source types for tab filtering
@@ -189,9 +185,27 @@ export default function DashboardClient() {
             };
         }
 
-        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) return { tag: "Aukat Strike Target", color: "bg-red-500/20 text-red-500 border border-red-500/30 font-black", pitch: `Hi ${lead.business_name}, I saw your legacy profile with ${(lead.review_count || 0)} reviews. You're a leader in the market, but your digital presence is missing. Can we talk about a high-end Next.js page?` };
-        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) return { tag: "Top Rated Target", color: "bg-purple-500/20 text-purple-400", pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating} Stars), but I couldn't find your website. Interested?` };
-        if (!lead.website) return { tag: "No Website", color: "bg-emerald-500/20 text-emerald-400", pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build professional web pages. Can I send a demo?` };
+        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) return {
+            tag: "Aukat Strike Target",
+            color: "bg-red-500/20 text-red-500 border border-red-500/30 font-black",
+            pitch: `Hi ${lead.business_name}, I saw your legacy profile with ${(lead.review_count || 0)} reviews. You're a leader in the market, but your digital presence is missing. Can we talk about a high-end Next.js page?`,
+            platform: "Google Maps",
+            jobUrl: lead.google_maps_url
+        };
+        if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) return {
+            tag: "Top Rated Target",
+            color: "bg-purple-500/20 text-purple-400",
+            pitch: `Hi ${lead.business_name}, I saw you're one of the top-rated in the area (${lead.rating} Stars), but I couldn't find your website. Interested?`,
+            platform: "Google Maps",
+            jobUrl: lead.google_maps_url
+        };
+        if (!lead.website) return {
+            tag: "No Website",
+            color: "bg-emerald-500/20 text-emerald-400",
+            pitch: `Hi ${lead.business_name}, noticed you don't have a website listed on Maps. We build professional web pages. Can I send a demo?`,
+            platform: "Google Maps",
+            jobUrl: lead.google_maps_url
+        };
 
         if (lead.source === 'VERIFIED_FUNDING' || (audit && audit.source === 'VERIFIED_FUNDING')) {
             const founderName = lead.contact_name || 'Founder';
@@ -210,7 +224,13 @@ export default function DashboardClient() {
             };
         }
 
-        return { tag: "Optimization", color: "bg-slate-700 text-slate-300", pitch: `Hi ${lead.business_name}, I help businesses optimize their digital presence. Open to a chat?` };
+        return {
+            tag: "Optimization",
+            color: "bg-slate-700 text-slate-300",
+            pitch: `Hi ${lead.business_name}, I help businesses optimize their digital presence. Open to a chat?`,
+            platform: lead.google_maps_url?.includes('maps') ? "Google Maps" : "Source",
+            jobUrl: lead.google_maps_url
+        };
     };
 
     const filteredLeads = leads.filter(l => {
@@ -405,12 +425,25 @@ function LeadCard({ lead, onToggle, pitch, analysis }: { lead: Lead, onToggle: (
                             <Info className="w-3 h-3" /> No Number
                         </div>
                     )}
+                    {lead.website ? (
+                        <a
+                            href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
+                            target="_blank"
+                            className="p-1 px-2 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
+                        >
+                            <Globe className="w-3 h-3" /> Visit Site
+                        </a>
+                    ) : (
+                        <div className="flex items-center gap-2 text-[10px] text-red-400 bg-red-500/10 px-2 py-1 rounded font-bold uppercase border border-red-500/20">
+                            <XCircle className="w-3 h-3" /> No Website
+                        </div>
+                    )}
                     <a
                         href={analysis.jobUrl || lead.google_maps_url}
                         target="_blank"
-                        className="p-1 px-2 rounded bg-slate-700/50 text-blue-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-blue-500/20"
+                        className="p-1 px-2 rounded bg-slate-700/50 text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold uppercase border border-white/5"
                     >
-                        <Globe className="w-3 h-3" /> {analysis.platform || "Source"}
+                        <MapPin className="w-3 h-3" /> View Source
                     </a>
                 </div>
             </div>
