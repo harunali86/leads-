@@ -414,6 +414,15 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                             <Globe className="w-4 h-4" /> VISIT SITE
                         </a>
                     )}
+                    {lead.phone && (
+                        <a
+                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all text-[11px] font-black uppercase border border-green-500/20"
+                        >
+                            <MessageCircle className="w-4 h-4" /> WHATSAPP
+                        </a>
+                    )}
                     <a
                         href={lead.google_maps_url}
                         target="_blank"
