@@ -21,7 +21,7 @@ const supabase = createClient(
         const survivors = leads.filter(l => {
             if (l.website) return false;
             if (!l.phone) return false;
-            if ((l.review_count || 0) < 100) return false;
+            if ((l.review_count || 0) < 70) return false;
 
             const name = (l.business_name || '').toLowerCase();
             const isHighValue = keywords.some(w => name.includes(w)) || (l.rating || 0) >= 4.7;
