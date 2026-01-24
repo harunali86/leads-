@@ -77,10 +77,15 @@ const getLeadSource = (lead: Lead): string => {
     if (lead.business_name?.startsWith('[Reddit]')) return 'REDDIT';
     if (lead.business_name?.startsWith('[FUNDED]')) return 'VERIFIED_FUNDING';
 
-    // 25 JAN SNIPER LOGIC (High Ticket Filter)
+    // 25 JAN SNIPER LOGIC (High Ticket + Established)
+    // Must be Established (40+ Reviews) + (High Ticket Name OR High Rating)
     const name = lead.business_name.toLowerCase();
     const highTicketKeywords = ['luxury', 'premium', 'diamond', 'gold', 'jewel', 'realty', 'estate', 'robotic', 'implant', 'architect', 'villa', 'residency', 'heights', 'developer', 'associate', 'international', 'wedding', 'event', 'clinic', 'fitness', 'gym', 'skin', 'derma', 'dental'];
-    if (!lead.website && lead.phone && highTicketKeywords.some(w => name.includes(w))) {
+
+    const isEstablished = (lead.review_count || 0) >= 40;
+    const isHighValue = highTicketKeywords.some(w => name.includes(w)) || (lead.rating || 0) >= 4.7;
+
+    if (!lead.website && lead.phone && isEstablished && isHighValue) {
         return 'JAN_25';
     }
 
