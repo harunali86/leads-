@@ -172,10 +172,10 @@ export default function DashboardClient() {
             result.tag = "Premium Target";
             result.color = "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20";
             result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile and your ${lead.rating}★ rating. I specialize in high-end digital audits for premium brands. Can I send a 2-min video audit of your profile?`;
-        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 100) {
+        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 70) {
             result.tag = "Aukat Strike Target";
-            result.color = "bg-red-500/20 text-red-500 border border-red-500/30 font-black";
-            result.pitch = `Hi ${lead.business_name}, I was looking for your services online but couldn't find a website. You have ${lead.review_count} reviews and it's 4.8★ - that's massive! I can build a conversion page to help you capture all the customers currently missing you. Open to a demo?`;
+            result.color = "bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg shadow-red-500/40 font-black animate-pulse";
+            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${lead.review_count} reviews and it's 4.8★ - that's huge! But you are losing so many customers because you don't have a website for booking/orders. I can build a conversion page for you today. Open to a 5-min demo?`;
         } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) {
             result.tag = "Top Rated Target";
             result.color = "bg-purple-500/20 text-purple-400";
@@ -204,6 +204,16 @@ export default function DashboardClient() {
             else if (activeTab === 'FUNDED') matchesSource = leadSource === 'VERIFIED_FUNDING' || leadSource === 'FUNDED';
         }
         return matchesSearch && matchesPremium && matchesSource;
+    }).sort((a, b) => {
+        const aAnalysis = getAnalysis(a);
+        const bAnalysis = getAnalysis(b);
+
+        // Priority 1: Aukat Strike Target
+        if (aAnalysis.tag === "Aukat Strike Target" && bAnalysis.tag !== "Aukat Strike Target") return -1;
+        if (aAnalysis.tag !== "Aukat Strike Target" && bAnalysis.tag === "Aukat Strike Target") return 1;
+
+        // Priority 2: Review Count
+        return (b.review_count || 0) - (a.review_count || 0);
     });
 
     return (
