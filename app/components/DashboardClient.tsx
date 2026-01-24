@@ -35,8 +35,18 @@ interface Lead {
 
 const isWhatsAppCapable = (lead: Lead) => {
     if (!lead.phone) return false;
+    // Reject placeholder text like SEARCH_REQUIRED
+    if (lead.phone.includes('SEARCH') || lead.phone.includes('REQUIRED') || lead.phone.includes('N/A')) return false;
     const clean = lead.phone.replace(/\D/g, '');
+    // Must have at least 10 digits to be a valid phone
     return clean.length >= 10;
+};
+
+// Helper to format phone for WhatsApp (auto-prefix 91 for Indian 10-digit numbers)
+const formatPhoneForWhatsApp = (phone: string): string => {
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length === 10) return '91' + clean;
+    return clean;
 };
 
 // Source types for tab filtering
@@ -454,19 +464,23 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                 </button>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 mt-4">
                 {isWhatsAppCapable(lead) ? (
                     <a
-                        href={`https://wa.me/${lead.phone!.replace(/\D/g, '').length === 10 ? '91' + lead.phone!.replace(/\D/g, '') : lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                        href={`https://wa.me/${formatPhoneForWhatsApp(lead.phone!)}?text=${encodeURIComponent(pitch)}`}
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/20 text-base active:scale-95 transition-all mt-2 border-b-4 border-emerald-700"
+                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/30 text-lg active:scale-95 transition-all border-b-4 border-emerald-700"
                     >
-                        <Send size={20} /> WHATSAPP STRIKE
+                        <Send size={24} /> WHATSAPP STRIKE
                     </a>
                 ) : (
-                    <button className="w-full bg-slate-700 text-slate-500 font-bold py-3 rounded-xl text-sm cursor-not-allowed italic">
-                        No WhatsApp Capability
-                    </button>
+                    <a
+                        href={analysis.sourceUrl}
+                        target="_blank"
+                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 text-lg active:scale-95 transition-all border-b-4 border-orange-700"
+                    >
+                        <Search size={24} /> FIND NUMBER ON MAPS
+                    </a>
                 )}
 
                 <div className="flex gap-2">
@@ -537,13 +551,21 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                     <a href={analysis.sourceUrl} target="_blank" className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg transition-all border border-emerald-500/20" title="View Source">
                         <MapPin size={18} />
                     </a>
-                    {isWhatsAppCapable(lead) && (
+                    {isWhatsAppCapable(lead) ? (
                         <a
-                            href={`https://wa.me/${lead.phone!.replace(/\D/g, '').length === 10 ? '91' + lead.phone!.replace(/\D/g, '') : lead.phone!.replace(/\D/g, '')}?text=${encodeURIComponent(pitch)}`}
+                            href={`https://wa.me/${formatPhoneForWhatsApp(lead.phone!)}?text=${encodeURIComponent(pitch)}`}
                             target="_blank"
-                            className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 border-b-2 border-emerald-700 active:translate-y-0.5"
+                            className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white px-6 py-2.5 rounded-xl text-sm font-black transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-2 border-b-2 border-emerald-700 active:translate-y-0.5"
                         >
-                            <Send size={14} /> STRIKE
+                            <Send size={16} /> STRIKE
+                        </a>
+                    ) : (
+                        <a
+                            href={analysis.sourceUrl}
+                            target="_blank"
+                            className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-orange-500/30 flex items-center gap-2 border-b-2 border-orange-700"
+                        >
+                            <Search size={14} /> FIND
                         </a>
                     )}
                     <button onClick={onToggle} className={`p-2 rounded-lg transition-all border ${lead.contacted ? 'bg-slate-700 text-slate-500' : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'}`}>
