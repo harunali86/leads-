@@ -36,8 +36,11 @@ interface Lead {
 const isWhatsAppCapable = (lead: Lead) => {
     if (!lead.phone) return false;
     const clean = lead.phone.replace(/\D/g, '');
-    // Valid for WhatsApp: 12 digits starting with 91, and next digit must be 6-9
-    return clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.substring(2));
+    // Support Indian formats: 10 digits, 11 digits (starts with 0), or 12 digits (starts with 91)
+    if (clean.length === 10 && /^[6-9]/.test(clean)) return true;
+    if (clean.length === 11 && clean.startsWith('0') && /^[6-9]/.test(clean.substring(1))) return true;
+    if (clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.substring(2))) return true;
+    return false;
 };
 
 // Source types for tab filtering
