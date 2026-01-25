@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope
+    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -26,7 +26,7 @@ interface Lead {
     review_count: number;
     google_maps_url: string;
     created_at: string;
-    contacted: boolean;
+    contacted: boolean; // This will be replaced by 'status'
     is_premium?: boolean;
     source?: string;
     contact_name?: string | null;
@@ -50,9 +50,10 @@ const formatPhoneForWhatsApp = (phone: string): string => {
 };
 
 // Source types for tab filtering
-type SourceTab = 'ALL' | 'JAN_25' | 'JAN_25_2' | 'JAN_25_3' | 'JAN_25_4' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
+type SourceTab = 'ALL' | 'MONEY_HUNT' | 'JAN_25' | 'JAN_25_2' | 'JAN_25_3' | 'JAN_25_4' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
 
 const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[] = [
+    { key: 'MONEY_HUNT', label: 'Money Hunt', icon: Send, color: 'emerald' },
     { key: 'JAN_25', label: '25 Jan', icon: Target, color: 'rose' },
     { key: 'JAN_25_2', label: 'Quality 200', icon: Award, color: 'amber' },
     { key: 'JAN_25_3', label: 'Elite Fresh', icon: Crown, color: 'purple' },
@@ -65,15 +66,17 @@ const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[]
     { key: 'FUNDED', label: 'Funded', icon: DollarSign, color: 'cyan' },
 ];
 
-// Helper to detect lead source from notes
+// Helper to parse notes correctly
+const parseNotes = (lead: Lead) => {
+    try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
+};
+
 const getLeadSource = (lead: Lead): string => {
-    try {
-        if (lead.notes) {
-            const notes = JSON.parse(lead.notes);
-            if (notes.source) return notes.source;
-            if (notes.market === 'MIDDLE_EAST') return 'GULF';
-        }
-    } catch (e) { }
+    const notes = parseNotes(lead);
+    const source = notes.source || lead.source;
+
+    if (source === 'INDEED_GULF_HUNT' || source === 'LINKEDIN_AUTH_SNIPE' || source === 'CENTURION_GULF_HUNT') return 'MONEY_HUNT';
+    if (notes.market === 'MIDDLE_EAST') return 'GULF';
     if (lead.source === 'JAN_25_4') return 'JAN_25_4';
     if (lead.source === 'JAN_25_3') return 'JAN_25_3';
     if (lead.source === 'GULF_SNIPER') return 'GULF';
@@ -83,7 +86,6 @@ const getLeadSource = (lead: Lead): string => {
     if (lead.business_name?.startsWith('[FUNDED]')) return 'VERIFIED_FUNDING';
 
     // 25 JAN SNIPER LOGIC (High Ticket + Established)
-    // Must be Established (40+ Reviews) + (High Ticket Name OR High Rating)
     const name = lead.business_name.toLowerCase();
     const highTicketKeywords = ['luxury', 'premium', 'diamond', 'gold', 'jewel', 'realty', 'estate', 'robotic', 'implant', 'architect', 'villa', 'residency', 'heights', 'developer', 'associate', 'international', 'wedding', 'event', 'clinic', 'fitness', 'gym', 'skin', 'derma', 'dental'];
 
@@ -95,7 +97,6 @@ const getLeadSource = (lead: Lead): string => {
     }
 
     // JAN 25.2 (QUALITY 200)
-    // 70+ Reviews + 4.7+ Rating + No Website + Phone
     if (!lead.website && lead.phone && (lead.review_count || 0) >= 70 && (lead.rating || 0) >= 4.7) {
         return 'JAN_25_2';
     }
@@ -113,7 +114,23 @@ export default function DashboardClient() {
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
     const [activeTab, setActiveTab] = useState<SourceTab>('ALL');
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
-    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
+    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
+
+    // Persistence Logic
+    useEffect(() => {
+        const savedTab = localStorage.getItem('activeTab') as SourceTab;
+        if (savedTab) setActiveTab(savedTab);
+
+        const handleScroll = () => {
+            localStorage.setItem('scrollPos', window.scrollY.toString());
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('activeTab', activeTab);
+    }, [activeTab]);
 
     useEffect(() => {
         fetchLeads();
@@ -126,50 +143,111 @@ export default function DashboardClient() {
 
     const fetchLeads = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('leads')
-            .select('*')
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('leads')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-        if (error) console.error("Supabase Error:", error);
+            if (error) console.error("Supabase Error:", error);
 
-        if (!error && data) {
-            setLeads(data);
-            setStats({
-                total: data.length,
-                qualified: data.filter(l => (l.quality_score || 0) > 60).length,
-                contacted: data.filter(l => l.status === 'CONTACTED' || l.contacted).length,
-                premium: data.filter(l => l.is_premium).length,
-                aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
-            });
-            // Count leads by source
-            const counts: Record<SourceTab, number> = { ALL: data.length, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
-            data.forEach(lead => {
-                const src = getLeadSource(lead);
-                if (src === 'JAN_25') counts.JAN_25++;
-                else if (src === 'JAN_25_2') counts.JAN_25_2++;
-                else if (src === 'JAN_25_3') counts.JAN_25_3++;
-                else if (src === 'JAN_25_4') counts.JAN_25_4++;
-                else if (src === 'GOOGLE_MAPS') counts.GOOGLE_MAPS++;
-                else if (src === 'GULF') counts.GULF++;
-                else if (src === 'HACKER_NEWS') counts.HACKER_NEWS++;
-                else if (src === 'REDDIT') counts.REDDIT++;
-                else if (src === 'VERIFIED_FUNDING' || src === 'FUNDED') counts.FUNDED++;
-            });
-            setSourceCounts(counts);
+            if (!error && data) {
+                setLeads(data);
+
+                // Auto-scroll after leads are loaded
+                setTimeout(() => {
+                    const savedScroll = localStorage.getItem('scrollPos');
+                    if (savedScroll) {
+                        window.scrollTo({ top: parseInt(savedScroll), behavior: 'smooth' });
+                    }
+                }, 500);
+
+                setStats({
+                    total: data.length,
+                    qualified: data.filter(l => (l.quality_score || 0) > 60).length,
+                    contacted: data.filter(l => l.status === 'CONTACTED').length,
+                    premium: data.filter(l => l.is_premium).length,
+                    aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
+                });
+                // Count leads by source
+                const counts: Record<SourceTab, number> = { ALL: data.length, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
+                data.forEach(lead => {
+                    const src = getLeadSource(lead);
+                    if (src === 'MONEY_HUNT') counts.MONEY_HUNT++;
+                    else if (src === 'JAN_25') counts.JAN_25++;
+                    else if (src === 'JAN_25_2') counts.JAN_25_2++;
+                    else if (src === 'JAN_25_3') counts.JAN_25_3++;
+                    else if (src === 'JAN_25_4') counts.JAN_25_4++;
+                    else if (src === 'GOOGLE_MAPS') counts.GOOGLE_MAPS++;
+                    else if (src === 'GULF') counts.GULF++;
+                    else if (src === 'HACKER_NEWS') counts.HACKER_NEWS++;
+                    else if (src === 'REDDIT') counts.REDDIT++;
+                    else if (src === 'VERIFIED_FUNDING' || src === 'FUNDED') counts.FUNDED++;
+                });
+                setSourceCounts(counts);
+            }
+        } catch (error) {
+            console.error("Error fetching leads:", error);
         }
         setLoading(false);
     };
 
-    const toggleContacted = async (id: string, current: boolean) => {
-        await supabase.from('leads').update({ contacted: !current }).eq('id', id);
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, contacted: !current } : l));
-        setStats(prev => ({ ...prev, contacted: prev.contacted + (current ? -1 : 1) }));
+    const toggleContacted = async (leadId: string) => {
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead) return;
+
+        const newStatus = lead.status === 'CONTACTED' ? 'NEW' : 'CONTACTED';
+
+        // Optimistic UI update
+        setLeads(leads.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+        setStats(prev => ({ ...prev, contacted: prev.contacted + (newStatus === 'CONTACTED' ? 1 : -1) }));
+
+        // DB Persistence
+        const { error } = await supabase
+            .from('leads')
+            .update({ status: newStatus })
+            .eq('id', leadId);
+
+        if (error) {
+            console.error('Failed to update status:', error);
+            // Revert on error
+            setLeads(leads.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
+            setStats(prev => ({ ...prev, contacted: prev.contacted + (lead.status === 'CONTACTED' ? 1 : -1) })); // Revert stats
+        }
+    };
+
+    const togglePin = async (lead: Lead) => {
+        const currentNotes = parseNotes(lead);
+        const isPinned = !!currentNotes.is_pinned;
+        const newNotes = { ...currentNotes, is_pinned: !isPinned };
+
+        await supabase.from('leads').update({ notes: JSON.stringify(newNotes) }).eq('id', lead.id);
+        // Optimistic update
+        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, notes: JSON.stringify(newNotes) } : l));
+    };
+
+    const deleteLead = async (leadId: string) => {
+        if (!confirm('Bhai, ye lead kachara hai? Delete kar doon?')) return;
+
+        // Optimistic UI update
+        const originalLeads = [...leads];
+        setLeads(leads.filter(l => l.id !== leadId));
+
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', leadId);
+
+        if (error) {
+            console.error('Delete failed:', error);
+            alert('Delete failed! Database issue maybe?');
+            setLeads(originalLeads); // Revert
+        }
     };
 
     const getAnalysis = (lead: Lead) => {
-        let audit: any = null;
-        try { if (lead.notes) audit = JSON.parse(lead.notes); } catch (e) { }
+        let audit: any = parseNotes(lead);
+        const isPinned = !!audit.is_pinned;
 
         const result = {
             tag: "Optimization",
@@ -180,10 +258,27 @@ export default function DashboardClient() {
             websiteUrl: lead.website,
             platform: "Maps",
             audit: audit,
-            budget: null as string | null
+            budget: null as string | null,
+            isPinned
         };
 
-        if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
+        if (lead.source === 'INDEED_GULF_HUNT' || lead.source === 'LINKEDIN_AUTH_SNIPE' || lead.source === 'CENTURION_GULF_HUNT') {
+            const role = audit.role || audit.job_title || 'High-Ticket Prospect';
+            const isGold = audit.is_gold_mine;
+            result.tag = isGold ? "GOLD MINE: High Conversion" : "Money Hunt: Hirer";
+            result.color = isGold
+                ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/30 font-black animate-pulse"
+                : "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20";
+
+            if (role.toLowerCase().includes('property') || role.toLowerCase().includes('estate') || role.toLowerCase().includes('real')) {
+                result.pitch = `Hi ${lead.business_name}, I saw your property ads. You are spending significantly on Marketing, but your Website isn't optimized for luxury conversions. You are losing high-net-worth clients. Let us fix your Web infrastructure so your Ad spend converts 2x better. Open to a chat?`;
+            } else if (role.toLowerCase().includes('web') || role.toLowerCase().includes('software') || role.toLowerCase().includes('it')) {
+                result.pitch = `Hi ${lead.business_name}, I saw you are looking for a ${role}. Instead of hiring one person and paying monthly salary + visa, we can build your complete High-Performance Website for a fixed cost. You get a premium result without recruitment headache. Open to a chat?`;
+            } else {
+                result.pitch = `Hi ${lead.business_name}, I saw you are hiring for ${role}. Most high-ticket campaigns fail because the website isn't optimized for conversions. Before you spend on more staff, let us fix your Website so your traffic actually turns into revenue. Open to a chat?`;
+            }
+            result.platform = audit.platform || "Indeed";
+        } else if (lead.source === 'HIGH_INTENT_PROJECT' || (audit && audit.intent === 'DIRECT_DEVELOPER_NEED')) {
             result.tag = "Project: Hot";
             result.color = "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/20";
             result.pitch = audit.ai_proposal || `Hi, I saw your project for ${lead.business_name}. I've handled similar tech stacks before. Can we discuss the specs?`;
@@ -235,11 +330,16 @@ export default function DashboardClient() {
             else if (activeTab === 'HACKER_NEWS') matchesSource = leadSource === 'HACKER_NEWS';
             else if (activeTab === 'REDDIT') matchesSource = leadSource === 'REDDIT';
             else if (activeTab === 'FUNDED') matchesSource = leadSource === 'VERIFIED_FUNDING' || leadSource === 'FUNDED';
+            else if (activeTab === 'MONEY_HUNT') matchesSource = leadSource === 'MONEY_HUNT';
         }
         return matchesSearch && matchesPremium && matchesSource;
     }).sort((a, b) => {
         const aAnalysis = getAnalysis(a);
         const bAnalysis = getAnalysis(b);
+
+        // Priority 0: PINNED (Absolute Top)
+        if (aAnalysis.isPinned && !bAnalysis.isPinned) return -1;
+        if (!aAnalysis.isPinned && bAnalysis.isPinned) return 1;
 
         // Priority 1: Aukat Strike Target
         if (aAnalysis.tag === "Aukat Strike Target" && bAnalysis.tag !== "Aukat Strike Target") return -1;
@@ -342,9 +442,20 @@ export default function DashboardClient() {
                     <>
                         {viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredLeads.map(lead => {
+                                {filteredLeads.map((lead, index) => {
                                     const analysis = getAnalysis(lead);
-                                    return <LeadCard key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={analysis.pitch} analysis={analysis} />
+                                    return (
+                                        <LeadCard
+                                            key={lead.id}
+                                            lead={lead}
+                                            index={index + 1}
+                                            onToggle={() => toggleContacted(lead.id)}
+                                            onTogglePin={() => togglePin(lead)}
+                                            onDelete={() => deleteLead(lead.id)}
+                                            pitch={analysis.pitch}
+                                            analysis={analysis}
+                                        />
+                                    );
                                 })}
                             </div>
                         ) : (
@@ -359,9 +470,9 @@ export default function DashboardClient() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-700/50">
-                                        {filteredLeads.map(lead => {
+                                        {filteredLeads.map((lead, index) => {
                                             const analysis = getAnalysis(lead);
-                                            return <LeadRow key={lead.id} lead={lead} onToggle={() => toggleContacted(lead.id, lead.contacted)} pitch={analysis.pitch} analysis={analysis} />
+                                            return <LeadRow key={lead.id} index={index + 1} lead={lead} onToggle={() => toggleContacted(lead.id)} onTogglePin={() => togglePin(lead)} onDelete={() => deleteLead(lead.id)} pitch={analysis.pitch} analysis={analysis} />
                                         })}
                                     </tbody>
                                 </table>
@@ -378,9 +489,12 @@ export default function DashboardClient() {
     );
 }
 
-function LeadCard({ lead, onToggle, pitch, analysis }: {
+function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
     lead: Lead,
+    index: number,
     onToggle: () => void,
+    onTogglePin: () => void,
+    onDelete: () => void,
     pitch: string,
     analysis: {
         tag: string,
@@ -390,35 +504,39 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
         sourceUrl: string,
         websiteUrl: string | null,
         budget?: string | null,
-        audit?: any
+        audit?: any,
+        isPinned: boolean
     }
 }) {
-    const [copied, setCopied] = useState(false);
-
-    const copyPitch = () => {
-        navigator.clipboard.writeText(pitch);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const sendEmail = () => {
-        if (!analysis.email) return;
-        const subject = encodeURIComponent(`Regarding your ${analysis.audit?.job_title || 'project'} proposal`);
-        const body = encodeURIComponent(`Hi ${analysis.audit?.founder_name || 'Founder'},\n\nI saw your post regarding ${analysis.audit?.job_title || 'hiring'}. Instead of a freelance headache, my agency can deliver this project directly with 24/7 support.\n\nBest regards,\nHarun`);
-        window.location.href = `mailto:${analysis.email}?subject=${subject}&body=${body}`;
-    };
-
     return (
-        <div className={`group relative bg-slate-800/40 border border-slate-700 rounded-2xl p-5 hover:border-blue-500/50 transition-all ${lead.contacted ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex flex-col gap-1">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit ${analysis.color}`}>
-                        {analysis.tag}
-                    </span>
-                    <h3 className="font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title={lead.business_name}>{lead.business_name}</h3>
+        <div className={`group relative bg-slate-800/40 border ${analysis.isPinned ? 'border-amber-500/50 shadow-lg shadow-amber-500/10' : 'border-slate-700'} rounded-2xl p-5 hover:border-blue-500/50 transition-all ${lead.status === 'CONTACTED' ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+            {/* GHAJINI-PROOF INDEXING */}
+            <div className="absolute -left-4 top-1/2 -translate-y-1/2 z-10">
+                <div className="bg-slate-900 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xl border-2 border-white transform -rotate-12 group-hover:rotate-0 transition-transform duration-300">
+                    #{index}
                 </div>
-                <div className="flex items-center gap-1 bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded-lg text-xs font-bold">
-                    {analysis.budget ? analysis.budget : <><Star className="w-3 h-3 fill-current" /> {lead.rating}</>}
+            </div>
+
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit ${analysis.color}`}>
+                            {analysis.tag}
+                        </span>
+                        <h3 className="font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title={lead.business_name}>{lead.business_name}</h3>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+                        className={`p-1.5 rounded-lg transition-all ${analysis.isPinned ? 'text-amber-400 bg-amber-500/10' : 'text-slate-600 hover:text-amber-400'}`}
+                        title="Pin this lead"
+                    >
+                        <Pin className={`w-4 h-4 ${analysis.isPinned ? 'fill-current' : ''}`} />
+                    </button>
+                    <div className="flex items-center gap-1 bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded-lg text-xs font-bold">
+                        {analysis.budget ? analysis.budget : <><Star className="w-3 h-3 fill-current" /> {lead.rating}</>}
+                    </div>
                 </div>
             </div>
 
@@ -449,7 +567,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                     )}
                     {lead.phone && (lead.phone_type === 'MOBILE' || (lead.phone.startsWith('91') && lead.phone.length === 12)) && (
                         <a
-                            href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                            href={`https://wa.me/${formatPhoneForWhatsApp(lead.phone!)}`}
                             target="_blank"
                             className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-white transition-all text-[11px] font-black uppercase border border-green-500/20"
                         >
@@ -464,16 +582,7 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                         <MapPin className="w-4 h-4" /> MAPS
                     </a>
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm('Bhai, ye lead kachara hai? Delete kar doon?')) {
-                                supabase.from('leads').delete().eq('id', lead.id).then(({ error }) => {
-                                    if (!error) {
-                                        window.location.reload(); // Simple reload to refresh list
-                                    }
-                                });
-                            }
-                        }}
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/20 group"
                         title="Kill this junk lead"
                     >
@@ -497,15 +606,12 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                         {(!analysis.audit.issues || analysis.audit.issues.length === 0) && <span className="text-[9px] text-emerald-400 font-bold">Verified: No critical gaps found</span>}
                     </div>
                 </div>
-            )
-            }
+            )}
 
             <div className="mb-4 bg-blue-500/5 rounded-xl p-4 border border-blue-500/10">
                 <div className="flex justify-between items-center mb-2">
                     <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Outreach Pitch</span>
-                    <button onClick={copyPitch} className="text-[9px] font-bold text-slate-500 hover:text-blue-400 uppercase transition-colors">
-                        {copied ? 'Copied' : 'Copy'}
-                    </button>
+                    <CopyPitchButton pitch={pitch} />
                 </div>
                 <p className="text-[11px] leading-relaxed text-slate-300 italic">
                     "{pitch}"
@@ -515,21 +621,14 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
             <div className="flex gap-2">
                 <button
                     onClick={onToggle}
-                    title={lead.contacted ? "Mark as New" : "Mark as Contacted"}
+                    title={lead.status === 'CONTACTED' ? "Mark as New" : "Mark as Contacted"}
                     className={`flex-1 flex justify-center py-2.5 rounded-xl transition-all border
-                            ${lead.contacted ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}
+                            ${lead.status === 'CONTACTED' ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}
                         `}
                 >
-                    {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                    {lead.status === 'CONTACTED' ? <XCircle size={18} /> : <CheckCircle size={18} />}
                 </button>
-                <button
-                    onClick={copyPitch}
-                    title={analysis.tag.includes('Project') ? "Copy AI Proposal" : "Copy Pitch message"}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                >
-                    {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
-                    <span className="text-[10px] font-bold uppercase">{copied ? "Copied!" : (analysis.tag.includes('Project') ? "Copy AI Proposal" : "Copy Pitch")}</span>
-                </button>
+                <CopyPitchButton pitch={pitch} isFullButton={true} tag={analysis.tag} />
             </div>
 
             <div className="flex flex-col gap-2 mt-4">
@@ -554,7 +653,11 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
                 <div className="flex gap-2">
                     {analysis.email && (
                         <button
-                            onClick={sendEmail}
+                            onClick={() => {
+                                const subject = encodeURIComponent(`Regarding your ${analysis.audit?.job_title || 'project'} proposal`);
+                                const body = encodeURIComponent(`Hi ${analysis.audit?.founder_name || 'Founder'},\n\nI saw your post regarding ${analysis.audit?.job_title || 'hiring'}. Instead of a freelance headache, my agency can deliver this project directly with 24/7 support.\n\nBest regards,\nHarun`);
+                                window.location.href = `mailto:${analysis.email}?subject=${subject}&body=${body}`;
+                            }}
                             className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 text-xs active:scale-95 transition-all"
                         >
                             <Mail size={14} /> Email
@@ -575,23 +678,32 @@ function LeadCard({ lead, onToggle, pitch, analysis }: {
     );
 }
 
-function LeadRow({ lead, onToggle, pitch, analysis }: {
+function LeadRow({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
     lead: Lead,
+    index: number,
     onToggle: () => void,
+    onTogglePin: () => void,
+    onDelete: () => void,
     pitch: string,
     analysis: {
         tag: string,
         color: string,
         sourceUrl: string,
         websiteUrl: string | null,
-        audit?: any
+        audit?: any,
+        isPinned: boolean
     }
 }) {
     return (
-        <tr className={`hover:bg-slate-800/40 transition-colors ${lead.contacted ? 'opacity-40' : ''}`}>
+        <tr className={`hover:bg-slate-800/40 transition-colors ${lead.status === 'CONTACTED' ? 'opacity-40' : ''} ${analysis.isPinned ? 'bg-amber-500/5' : ''}`}>
             <td className="p-4">
-                <div className="font-bold text-sm text-slate-200">{lead.business_name}</div>
-                <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-1 shrink-0"><MapPin size={10} /> <span className="truncate max-w-[200px]">{lead.address}</span></div>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-bold text-slate-500 w-6">#{index}</span>
+                    <div>
+                        <div className="font-bold text-sm text-slate-200">{lead.business_name}</div>
+                        <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-1 shrink-0"><MapPin size={10} /> <span className="truncate max-w-[200px]">{lead.address}</span></div>
+                    </div>
+                </div>
             </td>
             <td className="p-4">
                 <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${analysis.color}`}>
@@ -611,6 +723,13 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
             </td>
             <td className="p-4 text-right">
                 <div className="flex justify-end gap-3 items-center">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+                        className={`p-1.5 rounded-lg transition-all ${analysis.isPinned ? 'text-amber-400 bg-amber-500/10' : 'text-slate-600 hover:text-amber-400'}`}
+                        title="Pin this lead"
+                    >
+                        <Pin size={16} className={`${analysis.isPinned ? 'fill-current' : ''}`} />
+                    </button>
                     {analysis.websiteUrl && (
                         <a href={analysis.websiteUrl.startsWith('http') ? analysis.websiteUrl : `https://${analysis.websiteUrl}`} target="_blank" className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-lg transition-all border border-blue-500/20" title="Visit Website">
                             <Globe size={18} />
@@ -636,8 +755,11 @@ function LeadRow({ lead, onToggle, pitch, analysis }: {
                             <Search size={14} /> FIND
                         </a>
                     )}
-                    <button onClick={onToggle} className={`p-2 rounded-lg transition-all border ${lead.contacted ? 'bg-slate-700 text-slate-500' : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'}`}>
-                        {lead.contacted ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                    <button onClick={onDelete} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/20" title="Delete Lead">
+                        <Trash2 size={18} />
+                    </button>
+                    <button onClick={onToggle} className={`p-2 rounded-lg transition-all border ${lead.status === 'CONTACTED' ? 'bg-slate-700 text-slate-500' : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'}`}>
+                        {lead.status === 'CONTACTED' ? <XCircle size={18} /> : <CheckCircle size={18} />}
                     </button>
                 </div>
             </td>
@@ -683,5 +805,32 @@ function AddLeadModal({ onClose, onSave }: { onClose: () => void, onSave: () => 
                 </form>
             </div>
         </div>
+    );
+}
+
+function CopyPitchButton({ pitch, isFullButton, tag }: { pitch: string, isFullButton?: boolean, tag?: string }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        navigator.clipboard.writeText(pitch);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (isFullButton) {
+        return (
+            <button
+                onClick={copy}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+            >
+                {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
+                <span className="text-[10px] font-bold uppercase">{copied ? "Copied!" : (tag?.includes('Project') ? "Copy Proposal" : "Copy Pitch")}</span>
+            </button>
+        );
+    }
+
+    return (
+        <button onClick={copy} className="text-[9px] font-bold text-slate-500 hover:text-blue-400 uppercase transition-colors">
+            {copied ? 'Copied' : 'Copy'}
+        </button>
     );
 }
