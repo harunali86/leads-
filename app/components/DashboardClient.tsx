@@ -151,6 +151,7 @@ export default function DashboardClient() {
             const { data, error } = await supabase
                 .from('leads')
                 .select('*')
+                .neq('status', 'TRASH')
                 .order('created_at', { ascending: false });
 
             if (error) console.error("Supabase Error:", error);
@@ -232,20 +233,20 @@ export default function DashboardClient() {
     };
 
     const deleteLead = async (leadId: string) => {
-        if (!confirm('Bhai, ye lead kachara hai? Delete kar doon?')) return;
+        if (!confirm('Permanent Delete/Block: Yeh lead wapas kabhi nahi dikhegi (Hunter will skip it). Sure?')) return;
 
         // Optimistic UI update
         const originalLeads = [...leads];
-        setLeads(leads.filter(l => l.id !== leadId));
+        setLeads(leads.filter(l => l.id !== leadId)); // Remove from view immediately
 
         const { error } = await supabase
             .from('leads')
-            .delete()
+            .update({ status: 'TRASH' })
             .eq('id', leadId);
 
         if (error) {
-            console.error('Delete failed:', error);
-            alert('Delete failed! Database issue maybe?');
+            console.error('Block failed:', error);
+            alert('Block failed! Database issue maybe?');
             setLeads(originalLeads); // Revert
         }
     };
