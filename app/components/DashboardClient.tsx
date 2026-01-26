@@ -251,7 +251,7 @@ export default function DashboardClient() {
 
         const { error } = await supabase
             .from('leads')
-            .update({ status: 'TRASH' })
+            .delete()
             .eq('id', leadId);
 
         if (error) {
