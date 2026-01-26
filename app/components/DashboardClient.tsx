@@ -483,7 +483,7 @@ export default function DashboardClient() {
                                             index={index + 1}
                                             onToggle={() => toggleContacted(lead.id)}
                                             onTogglePin={() => togglePin(lead)}
-                                            onDelete={() => deleteLead(lead.id)}
+                                            onDelete={() => deleteLead(lead.id, lead)}
                                             pitch={analysis.pitch}
                                             analysis={analysis}
                                         />
