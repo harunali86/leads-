@@ -122,6 +122,16 @@ export default function DashboardClient() {
 
     // Persistence Logic
     useEffect(() => {
+        // Force Clear Cache for v2.1 update
+        const currentVersion = '2.1';
+        const savedVersion = localStorage.getItem('appVersion');
+        if (savedVersion !== currentVersion) {
+            console.log("🔥 Version Mismatch! Clearing Cache...");
+            localStorage.removeItem('leads_cache');
+            localStorage.removeItem('activeTab'); // Reset tab to force clean view
+            localStorage.setItem('appVersion', currentVersion);
+        }
+
         const savedTab = localStorage.getItem('activeTab') as SourceTab;
         if (savedTab) setActiveTab(savedTab);
 
@@ -365,8 +375,8 @@ export default function DashboardClient() {
                             <LayoutGrid className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl md:text-2xl font-bold tracking-tight">LeadForge <span className="text-blue-500 text-sm font-mono font-normal">v2.0</span></h1>
-                            <p className="text-slate-400 text-xs md:text-sm">Command Center</p>
+                            <h1 className="text-xl md:text-2xl font-bold tracking-tight">LeadForge <span className="text-emerald-500 text-sm font-mono font-normal">v2.1 (Clean)</span></h1>
+                            <p className="text-slate-400 text-xs md:text-sm">Command Center • Update: Jan 26 16:20</p>
                         </div>
                     </div>
 
