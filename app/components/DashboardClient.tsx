@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
@@ -62,7 +62,6 @@ export default function DashboardClient() {
         icon: any;
     }
 
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
 
     // Fallback for icons since we store string in DB
@@ -73,9 +72,10 @@ export default function DashboardClient() {
         return Target;
     };
 
-    // Initial Load: Fetch Campaigns from DB
-    useEffect(() => {
-        const fetchCampaigns = async () => {
+    // 1. Fetch Campaigns (React Query)
+    const { data: campaigns = [] } = useQuery({
+        queryKey: ['campaigns'],
+        queryFn: async () => {
             const { data, error } = await supabase
                 .from('campaigns')
                 .select('*')
@@ -83,34 +83,70 @@ export default function DashboardClient() {
                 .order('created_at', { ascending: true });
 
             if (data) {
-                const mapped = data.map(c => ({
+                return data.map(c => ({
                     ...c,
                     icon: getIcon(c.slug)
                 }));
-                setCampaigns(mapped);
-                // Default to first tab if none selected
-                if (!activeCampaignId && mapped.length > 0) setActiveCampaignId(mapped[0].id);
             }
-        };
-        fetchCampaigns();
-    }, []);
+            return [];
+        }
+    });
+
+    // Default to first tab if none selected
+    useEffect(() => {
+        if (!activeCampaignId && campaigns.length > 0) setActiveCampaignId(campaigns[0].id);
+    }, [campaigns, activeCampaignId]);
 
     // Helper to parse notes correctly
     const parseNotes = (lead: Lead) => {
         try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
     };
 
-    // Helper to calculate analysis (Moved/Kept inside component or outside? getAnalysis is usually global)
-    // Wait, getAnalysis was calling getLeadSource? No, getAnalysis is usually used in rendering.
-    // I need to ensure parseNotes is available.
+    // 2. Fetch Leads (React Query - Handles Race Conditions)
+    const { data: leads = [], isLoading: loading } = useQuery({
+        queryKey: ['leads', activeCampaignId],
+        queryFn: async () => {
+            if (!activeCampaignId) return [];
 
-    const [leads, setLeads] = useState<Lead[]>([]);
-    const [loading, setLoading] = useState(true);
+            // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
+            const { data, error } = await supabase
+                .from('leads')
+                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website')
+                .eq('campaign_id', activeCampaignId)
+                .neq('status', 'TRASH')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Client-side Dedup (Just in case)
+            const uniqueLeadsMap = new Map<string, any>();
+            data.forEach(lead => {
+                const normalizedName = lead.business_name.trim().toLowerCase();
+                if (!uniqueLeadsMap.has(normalizedName)) uniqueLeadsMap.set(normalizedName, lead);
+            });
+            return Array.from(uniqueLeadsMap.values()) as Lead[];
+        },
+        enabled: !!activeCampaignId, // Only run if we have a tab
+        staleTime: 5000,
+    });
+
     const [showAddForm, setShowAddForm] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
+
+    // Update Stats when leads change
+    useEffect(() => {
+        if (!leads) return;
+        setStats({
+            total: leads.length,
+            qualified: leads.filter(l => (l.quality_score || 0) > 60).length,
+            contacted: leads.filter(l => l.status === 'CONTACTED').length,
+            premium: leads.filter(l => l.is_premium).length,
+            aukat: leads.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
+        });
+    }, [leads]);
 
     // Persistence Logic
     useEffect(() => {
@@ -130,106 +166,56 @@ export default function DashboardClient() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    useEffect(() => {
-        fetchLeads();
-        const channel = supabase
-            .channel('realtime leads')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchLeads())
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [activeCampaignId]);
+    // Removed the old useEffect for fetching leads and supabase channel setup here.
 
-    const fetchLeads = async () => {
-        if (!activeCampaignId) return;
-
-        setLoading(true);
-        try {
-            // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
-            const { data, error } = await supabase
-                .from('leads')
-                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website')
-                .eq('campaign_id', activeCampaignId)
-                .neq('status', 'TRASH')
-                .order('created_at', { ascending: false });
-
-            if (error) console.error("Supabase Error:", error);
-
-            if (!error && data) {
-                // DEDUPLICATION: Enforce Unique Business Name (Client-Side Firewall)
-                const uniqueLeadsMap = new Map<string, any>();
-                data.forEach(lead => {
-                    const normalizedName = lead.business_name.trim().toLowerCase();
-                    if (!uniqueLeadsMap.has(normalizedName)) {
-                        uniqueLeadsMap.set(normalizedName, lead);
-                    }
-                });
-
-                const uniqueLeads = Array.from(uniqueLeadsMap.values());
-                setLeads(uniqueLeads);
-
-                // Auto-scroll after leads are loaded
-                setTimeout(() => {
-                    const savedScroll = localStorage.getItem('scrollPos');
-                    if (savedScroll) {
-                        window.scrollTo({ top: parseInt(savedScroll), behavior: 'smooth' });
-                    }
-                }, 500);
-
-                setStats({
-                    total: data.length,
-                    qualified: data.filter(l => (l.quality_score || 0) > 60).length,
-                    contacted: data.filter(l => l.status === 'CONTACTED').length,
-                    premium: data.filter(l => l.is_premium).length,
-                    aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
-                });
-
-            }
-        } catch (error) {
-            console.error("Error fetching leads:", error);
-        }
-        setLoading(false);
-    };
+    const queryClient = useQueryClient();
 
     const toggleContacted = async (leadId: string) => {
-        const lead = leads.find(l => l.id === leadId);
-        if (!lead) return;
+        // Optimistic Update
+        queryClient.setQueryData(['leads', activeCampaignId], (old: Lead[] | undefined) => {
+            if (!old) return [];
+            return old.map(l => l.id === leadId ? { ...l, status: l.status === 'CONTACTED' ? 'NEW' : 'CONTACTED' } : l);
+        });
 
-        const newStatus = lead.status === 'CONTACTED' ? 'NEW' : 'CONTACTED';
-
-        // Optimistic UI update
-        setLeads(leads.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
-        setStats(prev => ({ ...prev, contacted: prev.contacted + (newStatus === 'CONTACTED' ? 1 : -1) }));
-
-        // DB Persistence
-        const { error } = await supabase
-            .from('leads')
-            .update({ status: newStatus })
-            .eq('id', leadId);
-
-        if (error) {
-            console.error('Failed to update status:', error);
-            // Revert on error
-            setLeads(leads.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
-            setStats(prev => ({ ...prev, contacted: prev.contacted + (lead.status === 'CONTACTED' ? 1 : -1) })); // Revert stats
+        // Loophole: Update via Supabase (Fire and Forget)
+        const lead = leads.find(l => l.id === leadId); // `leads` is from useQuery, might be stale.
+        if (lead) {
+            const newStatus = lead.status === 'CONTACTED' ? 'NEW' : 'CONTACTED';
+            await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
         }
     };
 
     const togglePin = async (lead: Lead) => {
+        // Optimistic Update
+        queryClient.setQueryData(['leads', activeCampaignId], (old: Lead[] | undefined) => {
+            if (!old) return [];
+            return old.map(l => {
+                if (l.id === lead.id) {
+                    const currentNotes = parseNotes(l);
+                    const isPinned = !!currentNotes.is_pinned;
+                    const newNotes = { ...currentNotes, is_pinned: !isPinned };
+                    return { ...l, notes: JSON.stringify(newNotes) };
+                }
+                return l;
+            });
+        });
+
+        // DB Persistence
         const currentNotes = parseNotes(lead);
         const isPinned = !!currentNotes.is_pinned;
         const newNotes = { ...currentNotes, is_pinned: !isPinned };
-
         await supabase.from('leads').update({ notes: JSON.stringify(newNotes) }).eq('id', lead.id);
-        // Optimistic update
-        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, notes: JSON.stringify(newNotes) } : l));
     };
 
     const deleteLead = async (leadId: string, parsedLead: Lead) => {
-        if (!confirm('Permanent Delete/Block: Yeh lead wapas kabhi nahi dikhegi (Deleting all duplicates). Sure?')) return;
+        if (!confirm('Permanent Delete/Block: Sure?')) return;
 
         // Optimistic UI update - Remove ALL with same name
-        const originalLeads = [...leads];
-        setLeads(leads.filter(l => l.id !== leadId && l.business_name !== parsedLead.business_name));
+        queryClient.setQueryData(['leads', activeCampaignId], (old: Lead[] | undefined) => {
+            if (!old) return [];
+            const targetName = parsedLead.business_name;
+            return old.filter(l => l.id !== leadId && l.business_name !== targetName);
+        });
 
         // 1. Delete by ID (Targeted)
         const { error: idError } = await supabase
@@ -239,7 +225,7 @@ export default function DashboardClient() {
 
         // 2. Nuclear Delete by Name (Scorched Earth for Duplicates)
         if (parsedLead.business_name) {
-            const { error: nameError } = await supabase
+            await supabase
                 .from('leads')
                 .delete()
                 .eq('business_name', parsedLead.business_name);
@@ -247,8 +233,8 @@ export default function DashboardClient() {
 
         if (idError) {
             console.error('Block failed:', idError);
-            alert('Block failed! Database issue maybe?');
-            setLeads(originalLeads); // Revert
+            // Invalidate to Revert
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
         }
     };
 
@@ -438,6 +424,7 @@ export default function DashboardClient() {
                                         <LeadCard
                                             key={lead.id}
                                             lead={lead}
+                                            campaigns={campaigns}
                                             index={index + 1}
                                             onToggle={() => toggleContacted(lead.id)}
                                             onTogglePin={() => togglePin(lead)}
@@ -462,7 +449,7 @@ export default function DashboardClient() {
                                     <tbody className="divide-y divide-slate-700/50">
                                         {filteredLeads.map((lead, index) => {
                                             const analysis = getAnalysis(lead);
-                                            return <LeadRow key={lead.id} index={index + 1} lead={lead} onToggle={() => toggleContacted(lead.id)} onTogglePin={() => togglePin(lead)} onDelete={() => deleteLead(lead.id, lead)} pitch={analysis.pitch} analysis={analysis} />
+                                            return <LeadRow key={lead.id} index={index + 1} lead={lead} campaigns={campaigns} onToggle={() => toggleContacted(lead.id)} onTogglePin={() => togglePin(lead)} onDelete={() => deleteLead(lead.id, lead)} pitch={analysis.pitch} analysis={analysis} />
                                         })}
                                     </tbody>
                                 </table>
@@ -474,13 +461,14 @@ export default function DashboardClient() {
             </div>
 
             {/* Modals */}
-            {showAddForm && <AddLeadModal onClose={() => setShowAddForm(false)} onSave={fetchLeads} />}
+            {showAddForm && <AddLeadModal onClose={() => setShowAddForm(false)} onSave={() => queryClient.invalidateQueries({ queryKey: ['leads'] })} />}
         </div>
     );
 }
 
-function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
+function LeadCard({ lead, campaigns, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
     lead: Lead,
+    campaigns: any[],
     index: number,
     onToggle: () => void,
     onTogglePin: () => void,
@@ -510,9 +498,24 @@ function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysi
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit ${analysis.color}`}>
-                            {analysis.tag}
-                        </span>
+                        <div className="flex gap-2">
+                            {/* CAMPAIGN SOURCE BADGE */}
+                            {(() => {
+                                const camp = (campaigns || []).find(c => c.id === lead.campaign_id);
+                                return camp ? (
+                                    <span suppressHydrationWarning className={`text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-full bg-slate-900/80 text-${camp.color}-400 border border-${camp.color}-500/50 shadow-sm backdrop-blur-sm`}>
+                                        Source: {camp.name}
+                                    </span>
+                                ) : (
+                                    <span className="text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-full bg-slate-900/80 text-slate-500 border border-slate-700 shadow-sm backdrop-blur-sm">
+                                        Organic Search
+                                    </span>
+                                );
+                            })()}
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded w-fit ${analysis.color}`}>
+                                {analysis.tag}
+                            </span>
+                        </div>
                         <h3 className="font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title={lead.business_name}>{lead.business_name}</h3>
                     </div>
                 </div>
@@ -565,9 +568,10 @@ function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysi
                         </a>
                     )}
                     <a
-                        href={lead.google_maps_url}
+                        href={lead.google_maps_url?.startsWith('http') ? lead.google_maps_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.business_name)}`}
                         target="_blank"
-                        className="flex-1 flex items-center justify-center gap-2 p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-[11px] font-black uppercase border border-emerald-500/20"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-[11px] font-black uppercase border border-emerald-500/20 active:scale-95"
                     >
                         <MapPin className="w-4 h-4" /> MAPS
                     </a>
@@ -626,15 +630,17 @@ function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysi
                     <a
                         href={`https://wa.me/${formatPhoneForWhatsApp(lead.phone!)}?text=${encodeURIComponent(pitch)}`}
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/30 text-lg active:scale-95 transition-all border-b-4 border-emerald-700"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-500/30 text-xl active:scale-95 transition-all border-b-4 border-emerald-700 animate-pulse-subtle"
                     >
                         <Send size={24} /> WHATSAPP STRIKE
                     </a>
                 ) : (
                     <a
-                        href={lead.google_maps_url}
+                        href={lead.google_maps_url?.startsWith('http') ? lead.google_maps_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.business_name)}`}
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 text-lg active:scale-95 transition-all border-b-4 border-orange-700"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-black py-5 rounded-2xl shadow-xl shadow-orange-500/30 text-xl active:scale-95 transition-all border-b-4 border-orange-700"
                     >
                         <Search size={24} /> FIND NUMBER ON MAPS
                     </a>
@@ -668,8 +674,9 @@ function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysi
     );
 }
 
-function LeadRow({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
+function LeadRow({ lead, campaigns, index, onToggle, onTogglePin, onDelete, pitch, analysis }: {
     lead: Lead,
+    campaigns: any[],
     index: number,
     onToggle: () => void,
     onTogglePin: () => void,
