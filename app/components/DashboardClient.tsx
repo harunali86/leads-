@@ -163,16 +163,27 @@ export default function DashboardClient() {
     const fetchLeads = async () => {
         setLoading(true);
         try {
+            // OPTIMIZATION: Select only necessary columns (Source of Truth)
             const { data, error } = await supabase
                 .from('leads')
-                .select('*')
+                .select('id, business_name, status, phone, rating, review_count, source, is_premium, created_at, notes, google_maps_url, email, address, website')
                 .neq('status', 'TRASH')
                 .order('created_at', { ascending: false });
 
             if (error) console.error("Supabase Error:", error);
 
             if (!error && data) {
-                setLeads(data);
+                // DEDUPLICATION: Enforce Unique Business Name (Client-Side Firewall)
+                const uniqueLeadsMap = new Map();
+                data.forEach(lead => {
+                    const normalizedName = lead.business_name.trim().toLowerCase();
+                    if (!uniqueLeadsMap.has(normalizedName)) {
+                        uniqueLeadsMap.set(normalizedName, lead);
+                    }
+                });
+
+                const uniqueLeads = Array.from(uniqueLeadsMap.values());
+                setLeads(uniqueLeads);
 
                 // Auto-scroll after leads are loaded
                 setTimeout(() => {
