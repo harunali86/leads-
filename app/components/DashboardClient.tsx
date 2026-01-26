@@ -31,6 +31,7 @@ interface Lead {
     source?: string;
     contact_name?: string | null;
     notes?: string | null;
+    campaign_id?: string | null;
 }
 
 const isWhatsAppCapable = (lead: Lead) => {
@@ -115,6 +116,57 @@ const getLeadSource = (lead: Lead): string => {
 };
 
 export default function DashboardClient() {
+    // DYNAMIC CAMPAIGNS (Replaces Hardcoded Tabs)
+    interface Campaign {
+        id: string;
+        name: string;
+        slug: string;
+        color: string;
+        icon: any;
+    }
+
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+
+    // Fallback for icons since we store string in DB
+    const getIcon = (slug: string) => {
+        if (slug.includes('money')) return DollarSign;
+        if (slug.includes('jan_26')) return Crown;
+        if (slug.includes('jan_27')) return Star;
+        return Target;
+    };
+
+    // Initial Load: Fetch Campaigns from DB
+    useEffect(() => {
+        const fetchCampaigns = async () => {
+            const { data, error } = await supabase
+                .from('campaigns')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: true });
+
+            if (data) {
+                const mapped = data.map(c => ({
+                    ...c,
+                    icon: getIcon(c.slug)
+                }));
+                setCampaigns(mapped);
+                // Default to first tab if none selected
+                if (!activeCampaignId && mapped.length > 0) setActiveCampaignId(mapped[0].id);
+            }
+        };
+        fetchCampaigns();
+    }, []);
+
+    // Helper to parse notes correctly
+    const parseNotes = (lead: Lead) => {
+        try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
+    };
+
+    // Helper to calculate analysis (Moved/Kept inside component or outside? getAnalysis is usually global)
+    // Wait, getAnalysis was calling getLeadSource? No, getAnalysis is usually used in rendering.
+    // I need to ensure parseNotes is available.
+
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -158,15 +210,18 @@ export default function DashboardClient() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchLeads())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [activeCampaignId]);
 
     const fetchLeads = async () => {
+        if (!activeCampaignId) return;
+
         setLoading(true);
         try {
-            // OPTIMIZATION: Select only necessary columns (Source of Truth)
+            // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
             const { data, error } = await supabase
                 .from('leads')
-                .select('id, business_name, status, phone, rating, review_count, source, is_premium, created_at, notes, google_maps_url, email, address, website')
+                .select('id, business_name, status, phone, rating, review_count, campaign_id, is_premium, created_at, notes, google_maps_url, email, address, website')
+                .eq('campaign_id', activeCampaignId)
                 .neq('status', 'TRASH')
                 .order('created_at', { ascending: false });
 
@@ -360,22 +415,8 @@ export default function DashboardClient() {
         const matchesSearch = l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (l.phone && l.phone.includes(searchTerm));
         const matchesPremium = showPremiumOnly ? l.is_premium : true;
-        // Source tab filter
-        let matchesSource = true;
-        if (activeTab !== 'ALL') {
-            const leadSource = getLeadSource(l);
-            if (activeTab === 'JAN_25') matchesSource = leadSource === 'JAN_25';
-            else if (activeTab === 'JAN_25_2') matchesSource = leadSource === 'JAN_25_2';
-            else if (activeTab === 'JAN_25_3') matchesSource = leadSource === 'JAN_25_3';
-            else if (activeTab === 'JAN_25_4') matchesSource = leadSource === 'JAN_25_4';
-            else if (activeTab === 'GOOGLE_MAPS') matchesSource = leadSource === 'GOOGLE_MAPS';
-            else if (activeTab === 'GULF') matchesSource = leadSource === 'GULF' || leadSource === 'GULF_SNIPER';
-            else if (activeTab === 'HACKER_NEWS') matchesSource = leadSource === 'HACKER_NEWS';
-            else if (activeTab === 'REDDIT') matchesSource = leadSource === 'REDDIT';
-            else if (activeTab === 'FUNDED') matchesSource = leadSource === 'VERIFIED_FUNDING' || leadSource === 'FUNDED';
-            else if (activeTab === 'MONEY_HUNT') matchesSource = leadSource === 'MONEY_HUNT';
-        }
-        return matchesSearch && matchesPremium && matchesSource;
+
+        return matchesSearch && matchesPremium;
     }).sort((a, b) => {
         const aAnalysis = getAnalysis(a);
         const bAnalysis = getAnalysis(b);
@@ -419,25 +460,20 @@ export default function DashboardClient() {
             {/* Source Tabs */}
             <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4">
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {SOURCE_TABS.map(tab => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.key;
-                        const count = sourceCounts[tab.key];
+                    {campaigns.map(camp => {
+                        const Icon = camp.icon || Target;
+                        const isActive = activeCampaignId === camp.id;
                         return (
                             <button
-                                key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
+                                key={camp.id}
+                                onClick={() => setActiveCampaignId(camp.id)}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all whitespace-nowrap border ${isActive
-                                    ? `bg-${tab.color}-500/20 border-${tab.color}-500 text-${tab.color}-400`
+                                    ? `bg-${camp.color}-500/20 border-${camp.color}-500 text-${camp.color}-400`
                                     : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
                                     }`}
-                                style={isActive ? { backgroundColor: `var(--${tab.color}-500-20, rgba(59,130,246,0.2))` } : {}}
                             >
                                 <Icon size={16} />
-                                {tab.label}
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? `bg-${tab.color}-500/30` : 'bg-slate-700'}`}>
-                                    {count}
-                                </span>
+                                {camp.name}
                             </button>
                         );
                     })}
