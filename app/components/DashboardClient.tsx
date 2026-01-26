@@ -51,69 +51,6 @@ const formatPhoneForWhatsApp = (phone: string): string => {
 };
 
 // Source types for tab filtering
-type SourceTab = 'ALL' | 'MONEY_HUNT' | 'JAN_25' | 'JAN_25_2' | 'JAN_25_3' | 'JAN_25_4' | 'JAN_26' | 'JAN_27' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
-
-const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[] = [
-    { key: 'JAN_26', label: '26 Jan (Today)', icon: Award, color: 'violet' },
-    { key: 'JAN_27', label: '27 Jan (Tmrw)', icon: Star, color: 'blue' },
-    { key: 'MONEY_HUNT', label: 'Money Hunt', icon: Send, color: 'emerald' },
-    { key: 'JAN_25', label: '25 Jan', icon: Target, color: 'rose' },
-    { key: 'JAN_25_2', label: 'Quality 200', icon: Award, color: 'amber' },
-    { key: 'JAN_25_3', label: 'Elite Fresh', icon: Crown, color: 'purple' },
-    { key: 'JAN_25_4', label: 'Medical Match', icon: Stethoscope, color: 'cyan' },
-    { key: 'ALL', label: 'All', icon: LayoutGrid, color: 'blue' },
-    { key: 'GULF', label: 'Gulf', icon: Globe, color: 'purple' },
-    { key: 'GOOGLE_MAPS', label: 'Maps', icon: Map, color: 'emerald' },
-    { key: 'HACKER_NEWS', label: 'HN', icon: Newspaper, color: 'orange' },
-    { key: 'REDDIT', label: 'Reddit', icon: MessageCircle, color: 'red' },
-    { key: 'FUNDED', label: 'Funded', icon: DollarSign, color: 'cyan' },
-];
-
-// Helper to parse notes correctly
-const parseNotes = (lead: Lead) => {
-    try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
-};
-
-const getLeadSource = (lead: Lead): string => {
-    const notes = parseNotes(lead);
-    const source = notes.source || lead.source;
-
-    if (source === 'INDEED_GULF_HUNT' || source === 'LINKEDIN_AUTH_SNIPE' || source === 'CENTURION_GULF_HUNT') return 'MONEY_HUNT';
-    if (notes.market === 'MIDDLE_EAST') return 'GULF';
-    if (lead.source === 'JAN_25_4') return 'JAN_25_4';
-    if (lead.source === 'JAN_25_3') return 'JAN_25_3';
-    if (lead.source === 'JAN_26' || notes.source === 'JAN_26') return 'JAN_26';
-
-    // STRICT WHITELIST FOR JAN 26 (Hotfix for persisting old data)
-    const JAN_26_VERIFIED = ['Stay Better DXB', 'CoLife Dubai', 'AIZN Developers', 'Aark Developers', 'Key One Realty'];
-    if (JAN_26_VERIFIED.some(v => lead.business_name.includes(v))) return 'JAN_26';
-
-    if (lead.source === 'JAN_27') return 'JAN_27';
-    if (lead.source === 'GULF_SNIPER') return 'GULF';
-    if (lead.source) return lead.source;
-    if (lead.business_name?.startsWith('[HN]')) return 'HACKER_NEWS';
-    if (lead.business_name?.startsWith('[Reddit]')) return 'REDDIT';
-    if (lead.business_name?.startsWith('[FUNDED]')) return 'VERIFIED_FUNDING';
-
-    // 25 JAN SNIPER LOGIC (High Ticket + Established)
-    const name = lead.business_name.toLowerCase();
-    const highTicketKeywords = ['luxury', 'premium', 'diamond', 'gold', 'jewel', 'realty', 'estate', 'robotic', 'implant', 'architect', 'villa', 'residency', 'heights', 'developer', 'associate', 'international', 'wedding', 'event', 'clinic', 'fitness', 'gym', 'skin', 'derma', 'dental'];
-
-    const isEstablished = (lead.review_count || 0) >= 100;
-    const isHighValue = highTicketKeywords.some(w => name.includes(w)) || (lead.rating || 0) >= 4.7;
-
-    if (!lead.website && lead.phone && isEstablished && isHighValue) {
-        return 'JAN_25';
-    }
-
-    // JAN 25.2 (QUALITY 200)
-    if (!lead.website && lead.phone && (lead.review_count || 0) >= 70 && (lead.rating || 0) >= 4.7) {
-        return 'JAN_25_2';
-    }
-
-    if (lead.google_maps_url?.includes('google.com/maps')) return 'GOOGLE_MAPS';
-    return 'UNKNOWN';
-};
 
 export default function DashboardClient() {
     // DYNAMIC CAMPAIGNS (Replaces Hardcoded Tabs)
