@@ -81,7 +81,12 @@ const getLeadSource = (lead: Lead): string => {
     if (notes.market === 'MIDDLE_EAST') return 'GULF';
     if (lead.source === 'JAN_25_4') return 'JAN_25_4';
     if (lead.source === 'JAN_25_3') return 'JAN_25_3';
-    if (lead.source === 'JAN_26') return 'JAN_26';
+    if (lead.source === 'JAN_26' || notes.source === 'JAN_26') return 'JAN_26';
+
+    // STRICT WHITELIST FOR JAN 26 (Hotfix for persisting old data)
+    const JAN_26_VERIFIED = ['Stay Better DXB', 'CoLife Dubai', 'AIZN Developers', 'Aark Developers', 'Key One Realty'];
+    if (JAN_26_VERIFIED.some(v => lead.business_name.includes(v))) return 'JAN_26';
+
     if (lead.source === 'JAN_27') return 'JAN_27';
     if (lead.source === 'GULF_SNIPER') return 'GULF';
     if (lead.source) return lead.source;
