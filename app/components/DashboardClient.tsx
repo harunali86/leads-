@@ -110,9 +110,7 @@ export default function DashboardClient() {
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
-    const [activeTab, setActiveTab] = useState<SourceTab>('ALL');
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
-    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, JAN_27: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
 
     // Persistence Logic
     useEffect(() => {
@@ -122,12 +120,8 @@ export default function DashboardClient() {
         if (savedVersion !== currentVersion) {
             console.log("🔥 Version Mismatch! Clearing Cache...");
             localStorage.removeItem('leads_cache');
-            localStorage.removeItem('activeTab'); // Reset tab to force clean view
             localStorage.setItem('appVersion', currentVersion);
         }
-
-        const savedTab = localStorage.getItem('activeTab') as SourceTab;
-        if (savedTab) setActiveTab(savedTab);
 
         const handleScroll = () => {
             localStorage.setItem('scrollPos', window.scrollY.toString());
@@ -135,10 +129,6 @@ export default function DashboardClient() {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
-
-    useEffect(() => {
-        localStorage.setItem('activeTab', activeTab);
-    }, [activeTab]);
 
     useEffect(() => {
         fetchLeads();
