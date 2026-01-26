@@ -260,7 +260,13 @@ export default function DashboardClient() {
             isPinned
         };
 
-        if (lead.source === 'INDEED_GULF_HUNT' || lead.source === 'LINKEDIN_AUTH_SNIPE' || lead.source === 'CENTURION_GULF_HUNT') {
+        if (lead.source === 'AD_BURNER_HUNT') {
+            result.tag = "🔥 CASH BLEED: Social Ads";
+            result.color = "bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-600/30 font-black animate-pulse";
+            result.pitch = `Hi ${lead.business_name}, I searched for '${audit?.keyword || 'your services'}' and saw your Google Ad. You are paying for clicks but sending them to ${audit?.fail_reason?.includes('Social') ? 'a Social Media page' : 'a broken/generic link'} instead of a landing page. You are losing 70% of your ad spend. I can build a dedicated landing page to fix this leak. Open to a chat?`;
+            result.platform = "Google Ads";
+            result.sourceUrl = audit?.target_url || lead.google_maps_url;
+        } else if (lead.source === 'INDEED_GULF_HUNT' || lead.source === 'LINKEDIN_AUTH_SNIPE' || lead.source === 'CENTURION_GULF_HUNT') {
             const role = audit.role || audit.job_title || 'High-Ticket Prospect';
             const isGold = audit.is_gold_mine;
             result.tag = isGold ? "GOLD MINE: High Conversion" : "Money Hunt: Hirer";
