@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map as MapIcon, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check
+    Mail, UserPlus, Copy, Map as MapIcon, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check, Facebook, Instagram
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -111,7 +111,7 @@ export default function DashboardClient() {
             // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
             const { data, error } = await supabase
                 .from('leads')
-                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website')
+                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website, source')
                 .eq('campaign_id', activeCampaignId)
                 .neq('status', 'TRASH')
                 .order('created_at', { ascending: false });
@@ -134,6 +134,7 @@ export default function DashboardClient() {
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
+    const [hideWebsites, setHideWebsites] = useState(true); // STRICT MODE DEFAULT: ON
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
 
     // Update Stats when leads change
@@ -251,7 +252,9 @@ export default function DashboardClient() {
             email: lead.email,
             sourceUrl: lead.google_maps_url,
             websiteUrl: lead.website,
-            platform: "Maps",
+            platform: lead.source?.includes('FACEBOOK') ? "Facebook"
+                : lead.source?.includes('YELP') ? "Yelp"
+                    : lead.source?.includes('INSTAGRAM') ? "Instagram" : "Google Maps",
             audit: audit,
             budget: null as string | null,
             isPinned
@@ -312,8 +315,9 @@ export default function DashboardClient() {
         const matchesSearch = l.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (l.phone && l.phone.includes(searchTerm));
         const matchesPremium = showPremiumOnly ? l.is_premium : true;
+        const matchesWebsite = hideWebsites ? !l.website : true; // Sniper Logic
 
-        return matchesSearch && matchesPremium;
+        return matchesSearch && matchesPremium && matchesWebsite;
     }).sort((a, b) => {
         const aAnalysis = getAnalysis(a);
         const bAnalysis = getAnalysis(b);
@@ -396,6 +400,12 @@ export default function DashboardClient() {
                         className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all border ${showPremiumOnly ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
                     >
                         <Star className={`w-4 h-4 ${showPremiumOnly ? 'fill-current' : ''}`} /> Premium Only
+                    </button>
+                    <button
+                        onClick={() => setHideWebsites(!hideWebsites)}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all border ${hideWebsites ? 'bg-red-500/10 border-red-500 text-red-500 shadow-red-500/20 shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                    >
+                        <Globe className={`w-4 h-4 ${hideWebsites ? 'fill-current' : ''}`} /> {hideWebsites ? "Strict Mode: ON" : "Show All"}
                     </button>
                     <div className="bg-slate-800/50 p-1 rounded-lg border border-slate-700 hidden md:flex">
                         <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}><LayoutGrid size={18} /></button>
