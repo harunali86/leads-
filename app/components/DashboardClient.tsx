@@ -247,24 +247,35 @@ export default function DashboardClient() {
         setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, notes: JSON.stringify(newNotes) } : l));
     };
 
-    const deleteLead = async (leadId: string) => {
-        if (!confirm('Permanent Delete/Block: Yeh lead wapas kabhi nahi dikhegi (Hunter will skip it). Sure?')) return;
+    const deleteLead = async (leadId: string, parsedLead: Lead) => {
+        if (!confirm('Permanent Delete/Block: Yeh lead wapas kabhi nahi dikhegi (Deleting all duplicates). Sure?')) return;
 
-        // Optimistic UI update
+        // Optimistic UI update - Remove ALL with same name
         const originalLeads = [...leads];
-        setLeads(leads.filter(l => l.id !== leadId)); // Remove from view immediately
+        setLeads(leads.filter(l => l.id !== leadId && l.business_name !== parsedLead.business_name));
 
-        const { error } = await supabase
+        // 1. Delete by ID (Targeted)
+        const { error: idError } = await supabase
             .from('leads')
             .delete()
             .eq('id', leadId);
 
-        if (error) {
-            console.error('Block failed:', error);
+        // 2. Nuclear Delete by Name (Scorched Earth for Duplicates)
+        if (parsedLead.business_name) {
+            const { error: nameError } = await supabase
+                .from('leads')
+                .delete()
+                .eq('business_name', parsedLead.business_name);
+        }
+
+        if (idError) {
+            console.error('Block failed:', idError);
             alert('Block failed! Database issue maybe?');
             setLeads(originalLeads); // Revert
         }
     };
+
+
 
     const getAnalysis = (lead: Lead) => {
         let audit: any = parseNotes(lead);
@@ -493,7 +504,7 @@ export default function DashboardClient() {
                                     <tbody className="divide-y divide-slate-700/50">
                                         {filteredLeads.map((lead, index) => {
                                             const analysis = getAnalysis(lead);
-                                            return <LeadRow key={lead.id} index={index + 1} lead={lead} onToggle={() => toggleContacted(lead.id)} onTogglePin={() => togglePin(lead)} onDelete={() => deleteLead(lead.id)} pitch={analysis.pitch} analysis={analysis} />
+                                            return <LeadRow key={lead.id} index={index + 1} lead={lead} onToggle={() => toggleContacted(lead.id)} onTogglePin={() => togglePin(lead)} onDelete={() => deleteLead(lead.id, lead)} pitch={analysis.pitch} analysis={analysis} />
                                         })}
                                     </tbody>
                                 </table>
