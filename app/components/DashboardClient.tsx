@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check
+    Mail, UserPlus, Copy, Map as MapIcon, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -147,7 +147,7 @@ export default function DashboardClient() {
             // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
             const { data, error } = await supabase
                 .from('leads')
-                .select('id, business_name, status, phone, rating, review_count, campaign_id, is_premium, created_at, notes, google_maps_url, email, address, website')
+                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website')
                 .eq('campaign_id', activeCampaignId)
                 .neq('status', 'TRASH')
                 .order('created_at', { ascending: false });
@@ -156,7 +156,7 @@ export default function DashboardClient() {
 
             if (!error && data) {
                 // DEDUPLICATION: Enforce Unique Business Name (Client-Side Firewall)
-                const uniqueLeadsMap = new Map();
+                const uniqueLeadsMap = new Map<string, any>();
                 data.forEach(lead => {
                     const normalizedName = lead.business_name.trim().toLowerCase();
                     if (!uniqueLeadsMap.has(normalizedName)) {
@@ -182,23 +182,7 @@ export default function DashboardClient() {
                     premium: data.filter(l => l.is_premium).length,
                     aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
                 });
-                // Count leads by source
-                const counts: Record<SourceTab, number> = { ALL: data.length, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, JAN_27: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
-                data.forEach(lead => {
-                    const src = getLeadSource(lead);
-                    if (src === 'MONEY_HUNT') counts.MONEY_HUNT++;
-                    else if (src === 'JAN_25') counts.JAN_25++;
-                    else if (src === 'JAN_25_2') counts.JAN_25_2++;
-                    else if (src === 'JAN_25_3') counts.JAN_25_3++;
-                    else if (src === 'JAN_25_4') counts.JAN_25_4++;
-                    else if (src === 'JAN_26') counts.JAN_26++;
-                    else if (src === 'GOOGLE_MAPS') counts.GOOGLE_MAPS++;
-                    else if (src === 'GULF') counts.GULF++;
-                    else if (src === 'HACKER_NEWS') counts.HACKER_NEWS++;
-                    else if (src === 'REDDIT') counts.REDDIT++;
-                    else if (src === 'VERIFIED_FUNDING' || src === 'FUNDED') counts.FUNDED++;
-                });
-                setSourceCounts(counts);
+
             }
         } catch (error) {
             console.error("Error fetching leads:", error);
