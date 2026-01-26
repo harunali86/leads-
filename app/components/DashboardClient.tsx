@@ -50,10 +50,11 @@ const formatPhoneForWhatsApp = (phone: string): string => {
 };
 
 // Source types for tab filtering
-type SourceTab = 'ALL' | 'MONEY_HUNT' | 'JAN_25' | 'JAN_25_2' | 'JAN_25_3' | 'JAN_25_4' | 'JAN_26' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
+type SourceTab = 'ALL' | 'MONEY_HUNT' | 'JAN_25' | 'JAN_25_2' | 'JAN_25_3' | 'JAN_25_4' | 'JAN_26' | 'JAN_27' | 'GOOGLE_MAPS' | 'GULF' | 'HACKER_NEWS' | 'REDDIT' | 'FUNDED';
 
 const SOURCE_TABS: { key: SourceTab; label: string; icon: any; color: string }[] = [
-    { key: 'JAN_26', label: '26 (Instant)', icon: Award, color: 'violet' },
+    { key: 'JAN_26', label: '26 Jan (Today)', icon: Award, color: 'violet' },
+    { key: 'JAN_27', label: '27 Jan (Tmrw)', icon: Star, color: 'blue' },
     { key: 'MONEY_HUNT', label: 'Money Hunt', icon: Send, color: 'emerald' },
     { key: 'JAN_25', label: '25 Jan', icon: Target, color: 'rose' },
     { key: 'JAN_25_2', label: 'Quality 200', icon: Award, color: 'amber' },
@@ -81,6 +82,7 @@ const getLeadSource = (lead: Lead): string => {
     if (lead.source === 'JAN_25_4') return 'JAN_25_4';
     if (lead.source === 'JAN_25_3') return 'JAN_25_3';
     if (lead.source === 'JAN_26') return 'JAN_26';
+    if (lead.source === 'JAN_27') return 'JAN_27';
     if (lead.source === 'GULF_SNIPER') return 'GULF';
     if (lead.source) return lead.source;
     if (lead.business_name?.startsWith('[HN]')) return 'HACKER_NEWS';
@@ -116,7 +118,7 @@ export default function DashboardClient() {
     const [showPremiumOnly, setShowPremiumOnly] = useState(false);
     const [activeTab, setActiveTab] = useState<SourceTab>('ALL');
     const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
-    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
+    const [sourceCounts, setSourceCounts] = useState<Record<SourceTab, number>>({ ALL: 0, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, JAN_27: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 });
 
     // Persistence Logic
     useEffect(() => {
@@ -172,7 +174,7 @@ export default function DashboardClient() {
                     aukat: data.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
                 });
                 // Count leads by source
-                const counts: Record<SourceTab, number> = { ALL: data.length, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
+                const counts: Record<SourceTab, number> = { ALL: data.length, MONEY_HUNT: 0, JAN_25: 0, JAN_25_2: 0, JAN_25_3: 0, JAN_25_4: 0, JAN_26: 0, JAN_27: 0, GOOGLE_MAPS: 0, GULF: 0, HACKER_NEWS: 0, REDDIT: 0, FUNDED: 0 };
                 data.forEach(lead => {
                     const src = getLeadSource(lead);
                     if (src === 'MONEY_HUNT') counts.MONEY_HUNT++;
@@ -677,7 +679,7 @@ function LeadCard({ lead, index, onToggle, onTogglePin, onDelete, pitch, analysi
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
