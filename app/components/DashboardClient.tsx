@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import {
     Phone, MapPin, Globe, Star, Plus, Search,
     ExternalLink, CheckCircle, XCircle, Info, Menu, X, LayoutGrid, List,
-    Mail, UserPlus, Copy, Map as MapIcon, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check, Facebook, Instagram
+    Mail, UserPlus, Copy, Map as MapIcon, Newspaper, MessageCircle, DollarSign, Send, Trash2, Target, Award, Crown, Stethoscope, Pin, Check, Facebook, Instagram, Diamond
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -93,6 +93,7 @@ export default function DashboardClient() {
         if (slug.includes('money')) return DollarSign;
         if (slug.includes('jan_26')) return Crown;
         if (slug.includes('jan_27')) return Star;
+        if (slug.includes('quality_100')) return Diamond;
         return Target;
     };
 
