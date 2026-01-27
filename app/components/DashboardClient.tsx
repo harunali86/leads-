@@ -74,16 +74,122 @@ const formatPhoneForWhatsApp = (phone: string): string => {
     return clean;
 };
 
-// ... (Source types skipped)
+// Source types for tab filtering
 
 export default function DashboardClient() {
-    // ... (Campaigns skipped)
+    // DYNAMIC CAMPAIGNS (Replaces Hardcoded Tabs)
+    interface Campaign {
+        id: string;
+        name: string;
+        slug: string;
+        color: string;
+        icon: any;
+    }
 
-    // ... (Fetch Leads skipped)
+    const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
 
-    // ... (Stats skipped)
+    // Fallback for icons since we store string in DB
+    const getIcon = (slug: string) => {
+        if (slug.includes('money')) return DollarSign;
+        if (slug.includes('jan_26')) return Crown;
+        if (slug.includes('jan_27')) return Star;
+        return Target;
+    };
 
-    // ... (Persistence skipped)
+    // 1. Fetch Campaigns (React Query)
+    const { data: campaigns = [] } = useQuery({
+        queryKey: ['campaigns'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('campaigns')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: true });
+
+            if (data) {
+                return data.map(c => ({
+                    ...c,
+                    icon: getIcon(c.slug)
+                }));
+            }
+            return [];
+        }
+    });
+
+    // Default to first tab if none selected
+    useEffect(() => {
+        if (!activeCampaignId && campaigns.length > 0) setActiveCampaignId(campaigns[0].id);
+    }, [campaigns, activeCampaignId]);
+
+    // Helper to parse notes correctly
+    const parseNotes = (lead: Lead) => {
+        try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
+    };
+
+    // 2. Fetch Leads (React Query - Handles Race Conditions)
+    const { data: leads = [], isLoading: loading } = useQuery({
+        queryKey: ['leads', activeCampaignId],
+        queryFn: async () => {
+            if (!activeCampaignId) return [];
+
+            // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
+            const { data, error } = await supabase
+                .from('leads')
+                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website, source')
+                .eq('campaign_id', activeCampaignId)
+                .neq('status', 'TRASH')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Client-side Dedup (Just in case)
+            const uniqueLeadsMap = new Map<string, any>();
+            data.forEach(lead => {
+                const normalizedName = lead.business_name.trim().toLowerCase();
+                if (!uniqueLeadsMap.has(normalizedName)) uniqueLeadsMap.set(normalizedName, lead);
+            });
+            return Array.from(uniqueLeadsMap.values()) as Lead[];
+        },
+        enabled: !!activeCampaignId, // Only run if we have a tab
+        staleTime: 5000,
+    });
+
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showPremiumOnly, setShowPremiumOnly] = useState(false);
+    const [hideWebsites, setHideWebsites] = useState(true); // STRICT MODE DEFAULT: ON
+    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
+
+    // Update Stats when leads change
+    useEffect(() => {
+        if (!leads) return;
+        setStats({
+            total: leads.length,
+            qualified: leads.filter(l => (l.quality_score || 0) > 60).length,
+            contacted: leads.filter(l => l.status === 'CONTACTED').length,
+            premium: leads.filter(l => l.is_premium).length,
+            aukat: leads.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
+        });
+    }, [leads]);
+
+    // Persistence Logic
+    useEffect(() => {
+        // Force Clear Cache for v2.1 update
+        const currentVersion = '2.1';
+        const savedVersion = localStorage.getItem('appVersion');
+        if (savedVersion !== currentVersion) {
+            console.log("🔥 Version Mismatch! Clearing Cache...");
+            localStorage.removeItem('leads_cache');
+            localStorage.setItem('appVersion', currentVersion);
+        }
+
+        const handleScroll = () => {
+            localStorage.setItem('scrollPos', window.scrollY.toString());
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const queryClient = useQueryClient();
 
