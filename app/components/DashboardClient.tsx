@@ -43,131 +43,47 @@ const isWhatsAppCapable = (lead: Lead) => {
     return clean.length >= 10;
 };
 
-// Helper to format phone for WhatsApp (auto-prefix 91 for Indian 10-digit numbers)
+// Helper to format phone for WhatsApp (Smart Country Code)
 const formatPhoneForWhatsApp = (phone: string): string => {
-    const clean = phone.replace(/\D/g, '');
-    if (clean.length === 10) return '91' + clean;
+    let clean = phone.replace(/[^\d+]/g, ''); // Keep plus
+
+    // If it has country code (starts with +), just remove +
+    if (clean.startsWith('+')) return clean.substring(1);
+
+    // Dubai / UAE Logic (Most common for this user)
+    // Mobile starts with 05x (e.g., 050, 055, 056) -> 9715x
+    if (clean.startsWith('05')) {
+        return '971' + clean.substring(1);
+    }
+    // Landline starts with 04 -> 9714 (Likely no WhatsApp but valid format)
+    if (clean.startsWith('04')) {
+        return '971' + clean.substring(1);
+    }
+
+    // India Fallback (10 digits starting with 6-9)
+    if (clean.length === 10 && /^[6-9]/.test(clean)) {
+        return '91' + clean;
+    }
+
+    // Generic fallback: If missing country code but looks like mobile (9+ digits), assume UAE if unsure? 
+    // Safer to just return as is if unsure, or default to 971 if length is 9 (missing leading 0)
+    if (clean.length === 9 && clean.startsWith('5')) {
+        return '971' + clean;
+    }
+
     return clean;
 };
 
-// Source types for tab filtering
+// ... (Source types skipped)
 
 export default function DashboardClient() {
-    // DYNAMIC CAMPAIGNS (Replaces Hardcoded Tabs)
-    interface Campaign {
-        id: string;
-        name: string;
-        slug: string;
-        color: string;
-        icon: any;
-    }
+    // ... (Campaigns skipped)
 
-    const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+    // ... (Fetch Leads skipped)
 
-    // Fallback for icons since we store string in DB
-    const getIcon = (slug: string) => {
-        if (slug.includes('money')) return DollarSign;
-        if (slug.includes('jan_26')) return Crown;
-        if (slug.includes('jan_27')) return Star;
-        return Target;
-    };
+    // ... (Stats skipped)
 
-    // 1. Fetch Campaigns (React Query)
-    const { data: campaigns = [] } = useQuery({
-        queryKey: ['campaigns'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('campaigns')
-                .select('*')
-                .eq('is_active', true)
-                .order('created_at', { ascending: true });
-
-            if (data) {
-                return data.map(c => ({
-                    ...c,
-                    icon: getIcon(c.slug)
-                }));
-            }
-            return [];
-        }
-    });
-
-    // Default to first tab if none selected
-    useEffect(() => {
-        if (!activeCampaignId && campaigns.length > 0) setActiveCampaignId(campaigns[0].id);
-    }, [campaigns, activeCampaignId]);
-
-    // Helper to parse notes correctly
-    const parseNotes = (lead: Lead) => {
-        try { return lead.notes ? JSON.parse(lead.notes) : {}; } catch (e) { return {}; }
-    };
-
-    // 2. Fetch Leads (React Query - Handles Race Conditions)
-    const { data: leads = [], isLoading: loading } = useQuery({
-        queryKey: ['leads', activeCampaignId],
-        queryFn: async () => {
-            if (!activeCampaignId) return [];
-
-            // OPTIMIZATION V2: Filter by Campaign ID (Server Side)
-            const { data, error } = await supabase
-                .from('leads')
-                .select('id, business_name, status, phone, rating, review_count, campaign_id, quality_score, is_premium, created_at, notes, google_maps_url, email, address, website, source')
-                .eq('campaign_id', activeCampaignId)
-                .neq('status', 'TRASH')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-
-            // Client-side Dedup (Just in case)
-            const uniqueLeadsMap = new Map<string, any>();
-            data.forEach(lead => {
-                const normalizedName = lead.business_name.trim().toLowerCase();
-                if (!uniqueLeadsMap.has(normalizedName)) uniqueLeadsMap.set(normalizedName, lead);
-            });
-            return Array.from(uniqueLeadsMap.values()) as Lead[];
-        },
-        enabled: !!activeCampaignId, // Only run if we have a tab
-        staleTime: 5000,
-    });
-
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [showPremiumOnly, setShowPremiumOnly] = useState(false);
-    const [hideWebsites, setHideWebsites] = useState(true); // STRICT MODE DEFAULT: ON
-    const [stats, setStats] = useState({ total: 0, qualified: 0, contacted: 0, premium: 0, aukat: 0 });
-
-    // Update Stats when leads change
-    useEffect(() => {
-        if (!leads) return;
-        setStats({
-            total: leads.length,
-            qualified: leads.filter(l => (l.quality_score || 0) > 60).length,
-            contacted: leads.filter(l => l.status === 'CONTACTED').length,
-            premium: leads.filter(l => l.is_premium).length,
-            aukat: leads.filter(l => !l.website && (l.rating || 0) >= 4.5 && (l.review_count || 0) >= 100).length
-        });
-    }, [leads]);
-
-    // Persistence Logic
-    useEffect(() => {
-        // Force Clear Cache for v2.1 update
-        const currentVersion = '2.1';
-        const savedVersion = localStorage.getItem('appVersion');
-        if (savedVersion !== currentVersion) {
-            console.log("🔥 Version Mismatch! Clearing Cache...");
-            localStorage.removeItem('leads_cache');
-            localStorage.setItem('appVersion', currentVersion);
-        }
-
-        const handleScroll = () => {
-            localStorage.setItem('scrollPos', window.scrollY.toString());
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // Removed the old useEffect for fetching leads and supabase channel setup here.
+    // ... (Persistence skipped)
 
     const queryClient = useQueryClient();
 
@@ -179,7 +95,7 @@ export default function DashboardClient() {
         });
 
         // Loophole: Update via Supabase (Fire and Forget)
-        const lead = leads.find(l => l.id === leadId); // `leads` is from useQuery, might be stale.
+        const lead = leads.find(l => l.id === leadId);
         if (lead) {
             const newStatus = lead.status === 'CONTACTED' ? 'NEW' : 'CONTACTED';
             await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
@@ -209,33 +125,30 @@ export default function DashboardClient() {
     };
 
     const deleteLead = async (leadId: string, parsedLead: Lead) => {
-        if (!confirm('Permanent Delete/Block: Sure?')) return;
+        if (!confirm('PERMANENTLY DELETE: This will remove this lead and any duplicates forever. Sure?')) return;
 
-        // Optimistic UI update - Remove ALL with same name
+        // Optimistic UI update - Remove ALL with same name immediately
         queryClient.setQueryData(['leads', activeCampaignId], (old: Lead[] | undefined) => {
             if (!old) return [];
             const targetName = parsedLead.business_name;
             return old.filter(l => l.id !== leadId && l.business_name !== targetName);
         });
 
-        // 1. Delete by ID (Targeted)
-        const { error: idError } = await supabase
-            .from('leads')
-            .delete()
-            .eq('id', leadId);
-
-        // 2. Nuclear Delete by Name (Scorched Earth for Duplicates)
+        // NUCLEAR DELETE: Hard delete by Name to catch duplicates
         if (parsedLead.business_name) {
-            await supabase
+            const { error, count } = await supabase
                 .from('leads')
-                .delete()
+                .delete({ count: 'exact' })
                 .eq('business_name', parsedLead.business_name);
-        }
 
-        if (idError) {
-            console.error('Block failed:', idError);
-            // Invalidate to Revert
-            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            if (error) {
+                console.error('Delete failed:', error);
+                alert(`Error: ${error.message}`);
+                // Revert UI if needed (but usually better to force refresh)
+                queryClient.invalidateQueries({ queryKey: ['leads'] });
+            } else {
+                console.log(`Deleted ${count} rows for ${parsedLead.business_name}`);
+            }
         }
     };
 
