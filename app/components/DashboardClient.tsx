@@ -233,28 +233,33 @@ export default function DashboardClient() {
     const deleteLead = async (leadId: string, parsedLead: Lead) => {
         if (!confirm('PERMANENTLY DELETE: This will remove this lead and any duplicates forever. Sure?')) return;
 
-        // Optimistic UI update - Remove ALL with same name immediately
+        // Optimistic UI update
         queryClient.setQueryData(['leads', activeCampaignId], (old: Lead[] | undefined) => {
             if (!old) return [];
             const targetName = parsedLead.business_name;
             return old.filter(l => l.id !== leadId && l.business_name !== targetName);
         });
 
-        // NUCLEAR DELETE: Hard delete by Name to catch duplicates
-        if (parsedLead.business_name) {
-            const { error, count } = await supabase
-                .from('leads')
-                .delete({ count: 'exact' })
-                .eq('business_name', parsedLead.business_name);
+        // CALL SERVER API (Bypass RLS)
+        try {
+            const response = await fetch('/api/leads/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: leadId,
+                    business_name: parsedLead.business_name
+                })
+            });
 
-            if (error) {
-                console.error('Delete failed:', error);
-                alert(`Error: ${error.message}`);
-                // Revert UI if needed (but usually better to force refresh)
-                queryClient.invalidateQueries({ queryKey: ['leads'] });
-            } else {
-                console.log(`Deleted ${count} rows for ${parsedLead.business_name}`);
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'API Failed');
             }
+            console.log("✅ Deleted via API");
+        } catch (e: any) {
+            console.error('Delete failed:', e);
+            alert(`Error: ${e.message}`);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
         }
     };
 
