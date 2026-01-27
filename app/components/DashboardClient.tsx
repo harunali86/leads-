@@ -324,19 +324,21 @@ export default function DashboardClient() {
         } else if (lead.is_premium) {
             result.tag = "Premium Target";
             result.color = "bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/20";
-            result.pitch = `Hi ${lead.contact_name || lead.business_name}, I saw your profile and your ${lead.rating}★ rating. I specialize in high-end digital audits for premium brands. Can I send a 2-min video audit of your profile?`;
-        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50 && (lead.review_count || 0) <= 350) {
-            result.tag = "Aukat Strike Target";
-            result.color = "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/30 font-black animate-pulse";
-            result.pitch = `Hi ${lead.business_name}, I saw your profile with ${lead.review_count} reviews and it's ${lead.rating}★ - that's incredible local trust! I noticed you are missing a professional website to handle the growth. I can build a high-converting page for you. Open to a 5-min chat?`;
-        } else if (!lead.website && (lead.rating || 0) >= 4.5 && (lead.review_count || 0) >= 50) {
-            result.tag = "Top Rated Target";
-            result.color = "bg-purple-500/20 text-purple-400";
-            result.pitch = `Hi ${lead.business_name}, I saw you're one of the top-rated local spots (${lead.rating}★), but I couldn't find your website to check your services. I help businesses like yours get a professional digital presence. Can I send a sample?`;
-        } else if (!lead.website) {
-            result.tag = "No Website";
+
+            const variations = [
+                `Hi ${lead.business_name}, I saw your premium work on Instagram. I specialize in building high-performing websites for luxury brands in Dubai. Can I show you a 30-sec concept for your new site?`,
+                `Hi ${lead.business_name}, love the luxury projects you're posting. I noticed your current web presence doesn't fully capture your brand's elite status. Open to seeing a quick upgrade idea?`,
+                `Hi ${lead.business_name}, I build high-converting landing pages for high-ticket industries like yours. I've got a specific idea to help you get more bookings from your social traffic. Interested?`
+            ];
+            result.pitch = variations[Math.abs(lead.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % variations.length];
+        } else if (lead.source === 'MAPS_NO_WEBSITE' || !lead.website) {
+            result.tag = "No Website Gold";
             result.color = "bg-emerald-500/20 text-emerald-400";
-            result.pitch = `Hi ${lead.business_name}, I noticed you don't have a website listed on Maps yet. I'm a local dev and I build quick, affordable sites for businesses in the area. Can I send you a 1-page demo?`;
+            result.pitch = `Hi ${lead.business_name}, I saw your excellent profile on Maps. I noticed you don't have a professional website to capture leads yet. I can build you a high-performance site in 48 hours. Open to a quick chat?`;
+        } else {
+            result.tag = "Growth Target";
+            result.color = "bg-slate-700/50 text-slate-400";
+            result.pitch = `Hi ${lead.business_name}, I noticed your digital presence could be upgraded to better match your service quality. I build conversion-focused sites for local businesses. Can I send a sample?`;
         }
 
         return result;
