@@ -16,7 +16,15 @@ function validateSupabaseConfig(): void {
     }
 
     if (!supabaseUrl.startsWith('https://')) {
-        throw new Error('Invalid Supabase URL format. URL must start with https://');
+        // Allow http://localhost or http://127.0.0.1 in development
+        const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)/.test(supabaseUrl);
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+
+        if (!isLocalhost || !isDevelopment) {
+            throw new Error(
+                'Invalid Supabase URL format. URL must start with https:// (http://localhost is allowed in development)'
+            );
+        }
     }
 
     if (supabaseKey.length < 32) {
